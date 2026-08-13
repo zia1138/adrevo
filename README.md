@@ -14,6 +14,7 @@ Clone the repo and setup a `uv` environment as follows:
 ```bash
 git clone git@github.com:zia1138/adrevo.git
 cd adrevo
+git worktree add -b gh-pages site origin/gh-pages
 uv sync
 source .venv/bin/activate
 ```
