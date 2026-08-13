@@ -1,0 +1,36 @@
+[project]
+name = "adrevo"
+version = "0.1.0"
+description = "adrevo is an experimental system for agentic, AI-driven directed evolution of algorithms"
+readme = "README.md"
+authors = [
+    { name = "Zia Khan", email = "zia1138@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "ray[default]>=2.9.1",
+    "pydantic-ai>=1.23.0",
+    "typer>=0.12.0",
+    "questionary>=2.1.1",
+]
+
+[project.scripts]
+adrevo = "adrevo.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "nbconvert>=7.16.6",
+    "networkx",
+    "scikit-learn",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "zensical>=0.0.24",
+    "mkdocstrings-python>=2.0.3",
+    "huggingface-hub>=1.6.0",
+]
