@@ -1,4 +1,4 @@
-# adrevo
+# adrevo <a href="https://zia1138.github.io/adrevo"><img src="docs/adrevo.png" align="right" height="209" alt="adrevo docs" /></a>
 
 adrevo is an experimental system for agentic, AI-driven directed evolution of algorithms.
 It is built on [ray](https://www.ray.io/), 
