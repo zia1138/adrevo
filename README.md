@@ -75,6 +75,36 @@ Example root-level configs:
 
 See [src/adrevo/config.py](src/adrevo/config.py) for the configuration dataclasses and validation helpers.
 
+# Benchmarks
+
+Below are benchmarks using results from [AdaEvolve: Adaptive LLM Driven Zeroth-Order Optimization](https://arxiv.org/abs/2602.20133"). For OpenEvolve, GEPA, ShinkaEvolve, and AdaEvolve the GPT-5 backbone results are shown from the AdaEvolve paper.
+
+## Mathematical Optimization Results
+
+| Strategy | Circle Packing ↑ | Circle Packing (Rect) ↑ | Heilbronn (Convex) ↑ | Heilbronn (Triangles) ↑ | MinMax Distance ↑ | Signal Processing ↑ |
+|----------|-----------------:|------------------------:|---------------------:|------------------------:|------------------:|--------------------:|
+| Human / SOTA | 2.634 | 2.364 | 0.0306 | 0.0360 | 0.2399 | – |
+| AlphaEvolve | 2.635 | <span style="color:red"><strong>2.3658</strong></span> | 0.0309 | <span style="color:red"><strong>0.0365</strong></span> | 0.2398 | – |
+| OpenEvolve | 2.541 | 2.276 | 0.027 | 0.028 | 0.2243 | 0.622 |
+| GEPA | 2.628 | 2.354 | 0.027 | 0.032 | 0.2392 | 0.705 |
+| ShinkaEvolve | 2.541 | 2.358 | 0.026 | 0.034 | 0.2398 | 0.533 |
+| AdaEvolve | 2.63598308 | 2.361 | 0.029 | 0.036 | <span style="color:red"><strong>0.2404</strong></span> | 0.718 |
+| **adrevo** | **2.63598308499572** | 2.3621 | <span style="color:red"><strong>0.03092</strong></span> | <span style="color:red"><strong>0.0365</strong></span> | 0.2401 | <span style="color:red"><strong>0.956</strong></span> |
+| **Cost (adrevo)** | **$1.27** | **$1.81** | **$3.16** | **$4.61** | **$1.62** | **$2.61** |
+
+## ADRS Benchmark Results 
+
+| Strategy | Cloudcast ↓ (Best) | EPLB ↑ (Best) | Prism ↑ (Best) | LLM-SQL ↑ (Best) | TXN ↑ (Best) |
+|----------|-------------------:|--------------:|---------------:|-----------------:|-------------:|
+| Human / SOTA | 626.2 | 0.1265 | 21.89 | 0.692 | 2,725 |
+| OpenEvolve | 729.8 | 0.1272 | 26.23 | 0.716 | 4,329 |
+| GEPA | 645.7 | 0.1445 | 26.23 | 0.713 | 3,984 |
+| Shinka | 812.7 | 0.1272 | 26.26 | 0.713 | 4,329 |
+| AdaEvolve | 640.5 | 0.1453 | <span style="color:red"><strong>26.37</strong></span> | 0.775 | <span style="color:red"><strong>4,348</strong></span> |
+| **adrevo** | <span style="color:red"><strong>618.07</strong></span> | <span style="color:red"><strong>0.1516</strong></span> | 25.26 | <span style="color:red"><strong>0.9893</strong></span> | 4,273.50 |
+| **Cost (adrevo)** | **$3.20** | **$1.99** | **$0.22** | **$1.11** | **$1.46** |
+
+
 
 # Related Open Source Projects
 
