@@ -245,6 +245,23 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="" class="md-nav__link md-nav__link--active">
         
   
@@ -260,6 +277,81 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#project-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Project contract
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Commands
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operations
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Common failures
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -282,6 +374,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -293,6 +390,69 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#project-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Project contract
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Commands
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operations
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Common failures
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -318,7 +478,107 @@
   
 
 
-<h1 id="adrevo">adrevo<a class="headerlink" href="#adrevo" title="Permanent link">&para;</a></h1>
+<h1 id="adrevo">adrevo</h1>
+<p><img align="right" alt="adrevo" src="adrevo.png" /></p>
+<p>For the quickstart, custom-project overview, adaptive backtracking, and benchmark results, see the <a href="https://github.com/zia1138/adrevo#readme">README</a>. This page is the operational reference.</p>
+<h2 id="project-contract">Project contract</h2>
+<p>An adrevo project contains <code>main.py</code>, <code>evaluate.py</code>, and <code>config.py</code> (or a <code>config_*.py</code> variant).</p>
+<ul>
+<li><code>main.py</code>: your initial algorithm; adrevo replaces this file.</li>
+<li><code>evaluate.py</code>: validates <code>main.py</code> and writes <code>results.json</code>.</li>
+<li><code>config.py</code>: defines <code>get_adrevo_config()</code> and <code>get_backend_config()</code>.</li>
+</ul>
+<p><code>results.json</code> must contain <code>correct</code> (boolean), <code>error</code> (string or <code>null</code>), and <code>combined_score</code> (number). Higher scores are better. The current execution backend invokes <code>evaluate.py</code> by name.</p>
+<h2 id="configuration">Configuration</h2>
+<p>Configuration is Python. Construct the dataclasses and override only the defaults you need.</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Important fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelSpec</code></td>
+<td><code>model_id</code>, Pydantic AI <code>model</code>, <code>settings</code>, token costs, concurrency leases, model turns</td>
+</tr>
+<tr>
+<td><code>AdrevoConfig</code></td>
+<td>model builder, task prompt, workers, generations, cost limit, backtracking, strategies</td>
+</tr>
+<tr>
+<td><code>BackendConfig</code></td>
+<td>timeout, <code>uv</code>/<code>pixi</code>, immutable data directories</td>
+</tr>
+</tbody>
+</table>
+<p><code>build_evo_models()</code> returns one or more ordered <code>ModelSpec</code>s. Adrevo tries the next model after a failed attempt; after the final model fails, it may backtrack. Use <a href="https://pydantic.dev/docs/ai/models/overview">Pydantic AI's model API</a>. See the <a href="https://github.com/zia1138/adrevo/blob/main/examples/circle_packing/config_openai.py">example config</a> and <a href="https://github.com/zia1138/adrevo/blob/main/src/adrevo/config.py">all config fields</a>.</p>
+<h2 id="commands">Commands</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Purpose</th>
+<th>Key options</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adrevo run PROJECT</code></td>
+<td>Start one project</td>
+<td><code>--config</code>, <code>--results-dir</code>, <code>--verbose</code>, <code>--ray-address</code></td>
+</tr>
+<tr>
+<td><code>adrevo resume PROJECT</code></td>
+<td>Continue a checkpointed project</td>
+<td>required <code>--results-dir</code>; optional <code>--config</code></td>
+</tr>
+<tr>
+<td><code>adrevo run-folder PROJECT...</code></td>
+<td>Run several projects</td>
+<td><code>--config</code>, <code>--results-dir</code>, <code>--max-concurrent</code></td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>adrevo COMMAND --help</code> for the complete option list.</p>
+<h2 id="operations">Operations</h2>
+<p>Resume with the same project and results base:</p>
+<p><code>bash
+adrevo run my-project --results-dir ./results
+adrevo resume my-project --results-dir ./results</code></p>
+<p>The resumable directory is <code>./results/my-project/</code>; it contains <code>database_state.json</code>, <code>evogen_state.json</code>, and one <code>&lt;program-id&gt;.zip</code> per saved program. In-flight work is not resumed.</p>
+<p>For several projects:</p>
+<p><code>bash
+adrevo run-folder project-a project-b --results-dir ./results --max-concurrent 2</code></p>
+<p>Project directory names must be distinct. To connect to Ray Client, pass <code>--ray-address ray://HOST:10001</code> (or <code>--ray-ip HOST --ray-port 10001</code>). Use <code>--verbose</code> for Logfire logs and Pydantic AI traces; on a cluster, provide <code>.logfire/</code> credentials or <code>LOGFIRE_TOKEN</code> on every node.</p>
+<h2 id="common-failures">Common failures</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No config found</td>
+<td>Add <code>config.py</code> or <code>config_*.py</code>; use <code>--config</code> for several variants.</td>
+</tr>
+<tr>
+<td>Initial run fails</td>
+<td>Run <code>evaluate.py</code> locally; it must write a valid initial score.</td>
+</tr>
+<tr>
+<td>Run ends early</td>
+<td>Check generation/cost limits, evaluator timeout, and model credentials.</td>
+</tr>
+<tr>
+<td>Results directory exists</td>
+<td>Choose a new <code>--results-dir</code>; use <code>resume</code> only for a checkpointed run.</td>
+</tr>
+</tbody>
+</table>
 
 
 
