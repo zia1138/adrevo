@@ -1,4 +1,4 @@
-# adrevo <a href="https://zia1138.github.io/adrevo"><img src="docs/adrevo.png" align="right" height="160" alt="adrevo" /></a>
+# adrevo <a href="https://zia1138.github.io/adrevo"><img src="docs/adrevo.png" align="right" alt="adrevo" /></a>
 
 **adrevo evolves algorithms with AI.** It asks language models for complete program improvements, evaluates each candidate against your test, and keeps the ones that score better.
 
@@ -8,17 +8,19 @@ Inspired by AlphaEvolve-style program evolution, adrevo adds **adaptive backtrac
 
 ## Run an example
 
-Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key.
+Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), an OpenAI API key, and a [Logfire](https://logfire.pydantic.dev/login) account. Create a Logfire project named `adrevo` before continuing.
 
 ```bash
 git clone https://github.com/zia1138/adrevo.git
 cd adrevo
 uv sync
 export OPENAI_API_KEY=...
-uv run adrevo run examples/circle_packing --config config_openai.py
+logfire auth
+logfire projects use adrevo
+uv run adrevo run examples/circle_packing --config config_openai.py --verbose
 ```
 
-This evolves a solution for packing 26 circles in a unit square. Results are written to a timestamped `results_*` directory.
+The `--verbose` flag sends run logs and Pydantic AI traces to Logfire. This evolves a solution for packing 26 circles in a unit square; results are written to a timestamped `results_*` directory. For a Ray cluster, make the resulting `.logfire/` credentials (or `LOGFIRE_TOKEN`) available on every node.
 
 ## Create a project: code as configuration
 

@@ -327,3 +327,9 @@ show_source = false
 #      show_root_full_path: true
 #      show_root_members_full_path: true
 #      show_object_full_path: true
+
+# https://zensical.org/docs/authoring/images
+[project.markdown_extensions]
+attr_list = {}
+md_in_html = {}
+pymdownx.blocks.caption = {}
