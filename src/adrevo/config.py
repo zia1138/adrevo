@@ -8,6 +8,18 @@ from pydantic_ai.settings import ModelSettings
 
 @dataclass(frozen=True)
 class ModelSpec:
+    """
+    Specification for a model used in the evolution process.
+
+    Attributes:
+        model_id: Unique identifier for the model.
+        model: The model instance (e.g., a fully configured Pydantic AI model https://pydantic.dev/docs/ai/models/overview).
+        settings: Settings for the model (e.g., reasoning effort, service tier https://pydantic.dev/docs/ai/models/overview).
+        input_token_cost: Cost per 1M input tokens for the model.
+        output_token_cost: Cost per 1M output tokens for the model.
+        max_concurrent_leases: Maximum number of concurrent workers that can use the model.
+        max_model_turns: Maximum number of turns the model can take in a multi-turn interaction.
+    """
     model_id: str
     model: Model
     settings: ModelSettings
@@ -22,14 +34,22 @@ class AdrevoConfig:
     Configuration for adrevo run.
 
     Attributes:
+        build_evo_models: Callable that returns a list of ModelSpec objects, see config.py for examples.
         task_sys_msg: Optional system message for the task.
         num_agent_workers: Number of agent workers to use.
         max_generations: Maximum number of program generations to evolve.
-        use_probe: Whether to run diagnostic probing during the multi-turn loop.
         lang_identifier: Language used for any LLM code blocks (e.g. ```python ... ```).
-        evo_file: Name of the file to use for evolution/optimization. Default is main.py.
+        evo_file: Name of the file to use for rewriting for optimization/improvement/discovery. Default is main.py.
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
-        dl_evostate_freq: Frequency (in seconds) to download evo state from workers.
+        use_probe: Whether to run diagnostic probing during the multi-turn loop.
+        dl_evostate_freq: Frequency (in seconds) to download evo state from workers and database.
+        model_wait_poll_sec: Frequency (in seconds) to poll for model availability (limited by leases).
+        code_update_failures_before_diagnostics: Number of consecutive code update failures before running diagnostics.
+        pr_package_install: Probability of installing a package in the environment.
+        strategies: Tuple of strategy names to use for evolution.
+        pr_no_strategy: Probability of not using any strategy.
+        pr_strategies: Tuple of probabilities for each strategy in strategies.
+        max_cost: Maximum token cost allowed for evolution.
         backtrack_steps: Number of ancestors to move upward on max-rank failure.
     """
     build_evo_models: Callable[[], list[ModelSpec]]
@@ -119,12 +139,10 @@ class BackendConfig:
 
     Attributes:
         timeout_sec: Optional timeout in seconds for script execution. If None, no timeout is applied
-        extra_cmd_args: Optional dictionary of extra command-line arguments to pass to the evaluation script.
         data_dirs: Relative paths within the project directory to treat as immutable data.
             These are excluded from the code zip and staged once per node via symlinks.
             Example: ("valid_instances",)
     """
-    extra_cmd_args: Dict[str, Any] = field(default_factory=dict)
     timeout_sec: int = 10 * 60
     package_manager: str = "uv"  # or "pixi"
     data_dirs: tuple = ()  # relative paths to exclude from code zip, e.g. ("valid_instances",)
@@ -134,8 +152,6 @@ def validate_backend(cfg: BackendConfig) -> None:
     """Validate the BackendConfig object."""
     if not isinstance(cfg, BackendConfig):
         raise TypeError(f"Expected BackendConfig, got {type(cfg).__name__}")
-    if not isinstance(cfg.extra_cmd_args, dict):
-        raise ValueError("BackendConfig.extra_cmd_args must be a dictionary")
     if cfg.timeout_sec is not None and not _is_positive_int(cfg.timeout_sec):
         raise ValueError("BackendConfig.timeout_sec must be None or an integer >= 1")
     if not isinstance(cfg.package_manager, str):

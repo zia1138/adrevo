@@ -50,6 +50,7 @@ The evaluator must treat larger `combined_score` values as better. See [the conf
 ## Benchmarks
 
 Results use benchmark suites adapted from [skydiscover](https://github.com/skydiscover-ai/skydiscover). The OpenEvolve, GEPA, ShinkaEvolve, and AdaEvolve comparison rows are reported from the [AdaEvolve paper](https://arxiv.org/abs/2602.20133) with a GPT-5 backbone.
+adrevo results were obtained using `config_cerebras.py` configurations.
 
 ### Mathematical optimization
 
