@@ -8,7 +8,7 @@ Inspired by AlphaEvolve-style program evolution, adrevo adds **adaptive backtrac
 
 ## Run an example
 
-Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), a Cerebras API key, an OpenAI API key, and a [Logfire](https://logfire.pydantic.dev/login) account. Create a Logfire project named `adrevo` before continuing.
+Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), a [Cerebras](https://www.cerebras.ai) API key, an [OpenAI](https://platform.openai.com) API key, and a [Logfire](https://logfire.pydantic.dev/login) account. Create a Logfire project named `adrevo` before continuing.
 
 ```bash
 git clone https://github.com/zia1138/adrevo.git
@@ -21,22 +21,25 @@ logfire projects use adrevo
 uv run adrevo run examples/circle_packing --config config_cerebras.py --verbose
 ```
 
-The `--verbose` flag sends run logs and Pydantic AI traces to Logfire. This evolves a solution for packing 26 circles in a unit square; results are written to a timestamped `results_*` directory. For a Ray cluster, make the resulting `.logfire/` credentials (or `LOGFIRE_TOKEN`) available on every node.
+`uv sync` creates Adrevo's environment from this repository's `pyproject.toml`. The `--verbose` flag sends run logs and Pydantic AI traces to Logfire. This evolves a solution for packing 26 circles in a unit square; results are written to a timestamped `results_*` directory. For a Ray cluster, make the resulting `.logfire/` credentials (or `LOGFIRE_TOKEN`) available on every node.
 
 ## Create a project: code as configuration
 
-Create a directory containing these three files:
+Create a directory containing these files:
 
 ```text
 my-project/
 ├── main.py       # your initial algorithm; adrevo rewrites this file
 ├── evaluate.py   # your evaluator; imports main.py and writes results.json
-└── config.py     # your models and run settings
+├── config.py     # your models and run settings
+└── pyproject.toml # project dependencies, managed by uv
 ```
 
 `config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there; each creates an `AdrevoConfig` or `BackendConfig`, overriding only the dataclass defaults you need (for example, a task prompt, budget, timeout, or data directories).
 
 Also define `build_evo_models()`, which creates one or more `ModelSpec`s using [Pydantic AI's model API](https://pydantic.dev/docs/ai/models/overview). Multiple models are tried in configured order before adrevo backtracks. Keep variants such as `config_fast.py` or `config_openai.py`; adrevo will let you select one.
+
+Use `uv` to manage the project's environment: create its `pyproject.toml` with `uv init`, then add evaluator dependencies with `uv add PACKAGE`. Adrevo runs the evaluator through `uv run`, so each project uses the dependencies declared in its own `pyproject.toml`.
 
 Start from the [circle-packing example](examples/circle_packing), especially its [configuration](examples/circle_packing/config_openai.py) and [evaluator](examples/circle_packing/evaluate.py).
 

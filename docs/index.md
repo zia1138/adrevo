@@ -4,15 +4,18 @@
 
 For the quickstart, custom-project overview, adaptive backtracking, and benchmark results, see the [README](https://github.com/zia1138/adrevo#readme). This page is the operational reference.
 
-## Project contract
+## Project and environment contract
 
-An adrevo project contains `main.py`, `evaluate.py`, and `config.py` (or a `config_*.py` variant).
+An adrevo project contains `main.py`, `evaluate.py`, `config.py` (or a `config_*.py` variant), and `pyproject.toml`.
 
 - `main.py`: your initial algorithm; adrevo replaces this file.
 - `evaluate.py`: validates `main.py` and writes `results.json`.
 - `config.py`: defines `get_adrevo_config()` and `get_backend_config()`.
+- `pyproject.toml`: declares the dependencies used by the algorithm and evaluator.
 
 `results.json` must contain `correct` (boolean), `error` (string or `null`), and `combined_score` (number). Higher scores are better. The current execution backend invokes `evaluate.py` by name.
+
+`uv sync` creates the Adrevo environment from the repository's root `pyproject.toml`. Each evolution project manages its own evaluator environment: create its `pyproject.toml` with `uv init`, add packages with `uv add PACKAGE`, and adrevo will execute its evaluator with `uv run`.
 
 ## Configuration
 
