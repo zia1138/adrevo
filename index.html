@@ -295,10 +295,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#project-contract" class="md-nav__link">
+  <a href="#project-and-environment-contract" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Project contract
+        Project and environment contract
       </span>
     </span>
   </a>
@@ -398,10 +398,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#project-contract" class="md-nav__link">
+  <a href="#project-and-environment-contract" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Project contract
+        Project and environment contract
       </span>
     </span>
   </a>
@@ -481,14 +481,16 @@
 <h1 id="adrevo">adrevo</h1>
 <p><img align="right" alt="adrevo" src="adrevo.png" /></p>
 <p>For the quickstart, custom-project overview, adaptive backtracking, and benchmark results, see the <a href="https://github.com/zia1138/adrevo#readme">README</a>. This page is the operational reference.</p>
-<h2 id="project-contract">Project contract</h2>
-<p>An adrevo project contains <code>main.py</code>, <code>evaluate.py</code>, and <code>config.py</code> (or a <code>config_*.py</code> variant).</p>
+<h2 id="project-and-environment-contract">Project and environment contract</h2>
+<p>An adrevo project contains <code>main.py</code>, <code>evaluate.py</code>, <code>config.py</code> (or a <code>config_*.py</code> variant), and <code>pyproject.toml</code>.</p>
 <ul>
 <li><code>main.py</code>: your initial algorithm; adrevo replaces this file.</li>
 <li><code>evaluate.py</code>: validates <code>main.py</code> and writes <code>results.json</code>.</li>
 <li><code>config.py</code>: defines <code>get_adrevo_config()</code> and <code>get_backend_config()</code>.</li>
+<li><code>pyproject.toml</code>: declares the dependencies used by the algorithm and evaluator.</li>
 </ul>
 <p><code>results.json</code> must contain <code>correct</code> (boolean), <code>error</code> (string or <code>null</code>), and <code>combined_score</code> (number). Higher scores are better. The current execution backend invokes <code>evaluate.py</code> by name.</p>
+<p><code>uv sync</code> creates the Adrevo environment from the repository's root <code>pyproject.toml</code>. Each evolution project manages its own evaluator environment: create its <code>pyproject.toml</code> with <code>uv init</code>, add packages with <code>uv add PACKAGE</code>, and adrevo will execute its evaluator with <code>uv run</code>.</p>
 <h2 id="configuration">Configuration</h2>
 <p>Configuration is Python. Construct the dataclasses and override only the defaults you need.</p>
 <table>
