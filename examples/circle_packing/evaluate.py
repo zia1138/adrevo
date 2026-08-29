@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 N = 26
-OUTPUT_FILE = Path("circle_packing.json")
+OUTPUT_FILE = Path("evo/circle_packing.json")
 
 
 def validate_packing(centers, radii, atol=1e-10):
@@ -49,7 +49,10 @@ def validate_packing(centers, radii, atol=1e-10):
 if __name__ == "__main__":
     try:
         OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run([sys.executable, "main.py"], check=True, timeout=60)
+        subprocess.run(
+            ["uv", "run", "--directory", "evo", "python", "main.py"],
+            check=True,
+        )
 
         payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
         is_valid, error_msg = validate_packing(

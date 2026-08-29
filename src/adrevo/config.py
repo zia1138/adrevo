@@ -39,7 +39,7 @@ class AdrevoConfig:
         num_agent_workers: Number of agent workers to use.
         max_generations: Maximum number of program generations to evolve.
         lang_identifier: Language used for any LLM code blocks (e.g. ```python ... ```).
-        evo_file: Name of the file to use for rewriting for optimization/improvement/discovery. Default is main.py.
+        evo_file: Name of the file to use for rewriting for optimization/improvement/discovery. Default is evo/main.py.
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
         use_probe: Whether to run diagnostic probing during the multi-turn loop.
         dl_evostate_freq: Frequency (in seconds) to download evo state from workers and database.
@@ -57,7 +57,7 @@ class AdrevoConfig:
     num_agent_workers: int = 4
     max_generations: int = 500
     lang_identifier: str = "python"  # TODO: Add support for more languages.
-    evo_file: str = "main.py"
+    evo_file: str = "evo/main.py"
     evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
     use_probe: bool = True
     dl_evostate_freq: float = 30

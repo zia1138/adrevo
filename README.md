@@ -23,29 +23,66 @@ uv run adrevo run examples/circle_packing --config config_cerebras.py --verbose
 
 `uv sync` creates Adrevo's environment from this repository's `pyproject.toml`. The `--verbose` flag sends run logs and Pydantic AI traces to Logfire. This evolves a solution for packing 26 circles in a unit square; results are written to a timestamped `results_*` directory. For a Ray cluster, make the resulting `.logfire/` credentials (or `LOGFIRE_TOKEN`) available on every node.
 
-## Create a project: code as configuration
+## How it works
 
-Create a directory containing these files:
+Adrevo evolves candidate code; it does not decide whether that code is correct. You provide the trusted evaluator that does.
+
+1. You provide a project with trusted `evaluate.py`, an initial candidate at `evo/main.py`, and a configuration.
+2. Adrevo asks models for replacements of `evo/main.py`. It never edits `evaluate.py`.
+3. For each replacement, Adrevo runs `evaluate.py`. The evaluator builds and runs the candidate, validates its output, and writes `results.json`.
+4. Adrevo reads `results.json` and keeps candidates with a better `combined_score`.
+
+This boundary lets the evaluator stay stable and language-specific while the evolved candidate can use Python, Rust, Go, Node, or another runtime.
+
+## Code-as-config: trusted evaluator contract and environments
+
+Each project separates trusted evaluation from evolved code. This boundary keeps scoring stable while letting the candidate use any language or runtime.
+
+There are three environments:
+
+- **Adrevo:** the repository's `uv` environment runs the controller.
+- **Evaluator:** your root project's `pyproject.toml` and `uv` environment run trusted `evaluate.py`, separately from Adrevo's controller dependencies.
+- **Candidate:** `evo/` is built and run by the evaluator with uv, Cargo, Go, Node, Docker, or another runtime.
+
+Each evaluation follows this contract:
+
+1. Adrevo copies the project, replaces the configured `evo_file`, and runs `evaluate.py` in the `uv` environment you specified for the trusted evaluator.
+2. Trusted `evaluate.py` builds and runs the candidate, then validates its output file.
+3. The evaluator writes `results.json`; Adrevo reads it to decide whether the candidate improved.
+
+The evaluator must write:
+
+```json
+{"correct": true, "error": null, "combined_score": 1.23}
+```
+
+`correct` is a boolean, `error` is a string or `null`, and larger `combined_score` values are better. Adrevo never edits `evaluate.py`.
+
+Create the project like this:
 
 ```text
 my-project/
-├── main.py       # evolved candidate; writes a benchmark-defined output file
-├── evaluate.py   # trusted evaluator; runs the candidate and writes results.json
-├── config.py     # your models and run settings
-└── pyproject.toml # trusted evaluator dependencies, managed by uv
+├── evaluate.py        # trusted evaluator; writes results.json
+├── config.py          # models and run settings
+├── pyproject.toml     # trusted evaluator dependencies, managed by uv
+└── evo/               # evolvable candidate project
+    ├── main.py        # writes a benchmark-defined output file
+    └── pyproject.toml # candidate dependencies, if it uses uv
 ```
 
-`config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there; each creates an `AdrevoConfig` or `BackendConfig`, overriding only the dataclass defaults you need (for example, a task prompt, budget, timeout, or data directories).
+`config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there, and define `build_evo_models()` for the models Adrevo uses to evolve `evo/main.py`.
 
-Also define `build_evo_models()`, which creates one or more `ModelSpec`s using [Pydantic AI's model API](https://pydantic.dev/docs/ai/models/overview). Multiple models are tried in configured order before adrevo backtracks. Keep variants such as `config_fast.py` or `config_openai.py`; adrevo will let you select one.
+Run a project with:
 
-Adrevo uses its repository `uv` environment; each project has a separate `uv` environment for its trusted evaluator. `evaluate.py` may build and run the evolved candidate with any runtime or package manager, then validate its output file and write `results.json`. This supports candidates in languages beyond Python without changing Adrevo's result contract.
+```bash
+uv run adrevo run my-project --config config_openai.py
+```
 
 Start from the [circle-packing example](examples/circle_packing), especially its [configuration](examples/circle_packing/config_openai.py) and [evaluator](examples/circle_packing/evaluate.py).
 
 ## How search works
 
-1. Models propose a complete replacement for `main.py`; trusted `evaluate.py` runs it, validates its output, and reports a `combined_score`.
+1. Models propose a complete replacement for the configured `evo_file`; trusted `evaluate.py` runs it, validates its output, and reports a `combined_score`.
 2. A new global best becomes the committed search lineage. A local improvement can be explored as a side branch without replacing that lineage.
 3. If the final model in the configured model list cannot improve the current branch, adrevo backtracks one or more ancestors (`backtrack_steps`) and continues from there.
 
