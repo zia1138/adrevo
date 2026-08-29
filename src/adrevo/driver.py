@@ -77,6 +77,7 @@ class AdrevoDriver:
         # TODO: Allow modal, beam.could and other backends here.
         self.backend = RayExecutionBackend(
             config=backend_config,
+            evaluator_file=evo_config.evaluate_file,
             verbose=verbose,
         )
 

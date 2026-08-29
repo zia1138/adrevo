@@ -389,6 +389,7 @@ class AdrevoWorker:
 
         self.backend = RayExecutionBackend(
             config=backend_config,
+            evaluator_file=evo_config.evaluate_file,
             verbose=verbose,
             data_handle=data_handle,
         )

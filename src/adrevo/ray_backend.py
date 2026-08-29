@@ -241,8 +241,15 @@ class RayExecutionBackend(ExecutionBackend):
     Ray-based implementation of the execution backend.
     It executes jobs synchronously in the current Ray actor or driver process.
     """
-    def __init__(self, config: BackendConfig, verbose: bool = True, data_handle=None):
+    def __init__(
+        self,
+        config: BackendConfig,
+        evaluator_file: str,
+        verbose: bool = True,
+        data_handle=None,
+    ):
         self.config = config
+        self.evaluator_file = evaluator_file
         self.verbose = verbose
         self.data_handle = data_handle  # opaque handle from stage_data() (bytes)
         self.data_dirs = config.data_dirs
@@ -255,7 +262,7 @@ class RayExecutionBackend(ExecutionBackend):
     def _build_command(self) -> List[str]:
         # The evaluator runs from the extracted project directory. Select it
         # explicitly instead of relying on an inherited active environment.
-        return ["uv", "-q", "run", "--project", ".", "python", "evaluate.py"]
+        return ["uv", "-q", "run", "--project", ".", "python", self.evaluator_file]
 
     def run_job(
         self,
