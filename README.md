@@ -29,23 +29,23 @@ Create a directory containing these files:
 
 ```text
 my-project/
-├── main.py       # your initial algorithm; adrevo rewrites this file
-├── evaluate.py   # your evaluator; imports main.py and writes results.json
+├── main.py       # evolved candidate; writes a benchmark-defined output file
+├── evaluate.py   # trusted evaluator; runs the candidate and writes results.json
 ├── config.py     # your models and run settings
-└── pyproject.toml # project dependencies, managed by uv
+└── pyproject.toml # trusted evaluator dependencies, managed by uv
 ```
 
 `config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there; each creates an `AdrevoConfig` or `BackendConfig`, overriding only the dataclass defaults you need (for example, a task prompt, budget, timeout, or data directories).
 
 Also define `build_evo_models()`, which creates one or more `ModelSpec`s using [Pydantic AI's model API](https://pydantic.dev/docs/ai/models/overview). Multiple models are tried in configured order before adrevo backtracks. Keep variants such as `config_fast.py` or `config_openai.py`; adrevo will let you select one.
 
-Use `uv` to manage the project's environment: create its `pyproject.toml` with `uv init`, then add evaluator dependencies with `uv add PACKAGE`. Adrevo runs the evaluator through `uv run`, so each project uses the dependencies declared in its own `pyproject.toml`.
+Adrevo uses its repository `uv` environment; each project has a separate `uv` environment for its trusted evaluator. `evaluate.py` may build and run the evolved candidate with any runtime or package manager, then validate its output file and write `results.json`. This supports candidates in languages beyond Python without changing Adrevo's result contract.
 
 Start from the [circle-packing example](examples/circle_packing), especially its [configuration](examples/circle_packing/config_openai.py) and [evaluator](examples/circle_packing/evaluate.py).
 
 ## How search works
 
-1. Models propose a complete replacement for `main.py`; `evaluate.py` decides whether it is valid and reports a `combined_score`.
+1. Models propose a complete replacement for `main.py`; trusted `evaluate.py` runs it, validates its output, and reports a `combined_score`.
 2. A new global best becomes the committed search lineage. A local improvement can be explored as a side branch without replacing that lineage.
 3. If the final model in the configured model list cannot improve the current branch, adrevo backtracks one or more ancestors (`backtrack_steps`) and continues from there.
 

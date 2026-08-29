@@ -1009,12 +1009,7 @@ class AdrevoWorker:
             print(" ".join(package_names))
             """),
         ]
-        if self.backend.config.package_manager == "uv":
-            cmd = ["uv", "run", *python_cmd]
-        elif self.backend.config.package_manager == "pixi":
-            cmd = ["pixi", "run", *python_cmd]
-        else:
-            cmd = python_cmd
+        cmd = ["uv", "run", "--project", ".", *python_cmd]
 
         result = self.backend.run_command(
             parent_zip_bytes=context.current_zip_bytes,

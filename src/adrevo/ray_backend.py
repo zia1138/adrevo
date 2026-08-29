@@ -147,7 +147,6 @@ def _run_evaluator_task(
         # 3. Setup environment variables
         env = os.environ.copy()
         env.update(PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
-        env.pop("VIRTUAL_ENV", None) # TODO: Make this a parameter for only when uv is used.
 
         # 4. Execute the command, polling for timeout or stale-parent preemption.
         stdout_path = temp_path / "job_log.out"
@@ -209,7 +208,6 @@ def _run_command_task(
 
         env = os.environ.copy()
         env.update(PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
-        env.pop("VIRTUAL_ENV", None) # TODO: Make this a parameter for only when uv is used.
 
         stdout_path = Path(temp_dir) / "job_log.out"
         stderr_path = Path(temp_dir) / "job_log.err"
@@ -255,18 +253,9 @@ class RayExecutionBackend(ExecutionBackend):
         return self.data_handle
 
     def _build_command(self) -> List[str]:
-        base = []
-        if self.config.package_manager == "uv":
-            base = ["uv", "-q", "run"]
-        elif self.config.package_manager == "pixi":
-            base = ["pixi", "run"]
-        cmd = [
-            *base,
-            "python",
-            "evaluate.py",
-        ]
-
-        return cmd
+        # The evaluator runs from the extracted project directory. Select it
+        # explicitly instead of relying on an inherited active environment.
+        return ["uv", "-q", "run", "--project", ".", "python", "evaluate.py"]
 
     def run_job(
         self,

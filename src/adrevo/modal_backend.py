@@ -265,12 +265,7 @@ class ModalExecutionBackend(ExecutionBackend):
         pass
 
     def _build_command(self) -> List[str]:
-        base = []
-        if self.config.package_manager == "uv":
-            base = ["uv", "-q", "run"]
-        elif self.config.package_manager == "pixi":
-            base = ["pixi", "run"]
-        return [*base, "python", "evaluate.py"]
+        return ["uv", "-q", "run", "--project", ".", "python", "evaluate.py"]
 
     def run_job(
         self,

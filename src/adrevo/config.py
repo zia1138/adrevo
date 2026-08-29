@@ -135,7 +135,7 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
 @dataclass(frozen=True)
 class BackendConfig:
     """
-    Configuration for script execution.
+    Configuration for trusted evaluator execution with uv.
 
     Attributes:
         timeout_sec: Optional timeout in seconds for script execution. If None, no timeout is applied
@@ -144,7 +144,6 @@ class BackendConfig:
             Example: ("valid_instances",)
     """
     timeout_sec: int = 10 * 60
-    package_manager: str = "uv"  # or "pixi"
     data_dirs: tuple = ()  # relative paths to exclude from code zip, e.g. ("valid_instances",)
 
 
@@ -154,10 +153,6 @@ def validate_backend(cfg: BackendConfig) -> None:
         raise TypeError(f"Expected BackendConfig, got {type(cfg).__name__}")
     if cfg.timeout_sec is not None and not _is_positive_int(cfg.timeout_sec):
         raise ValueError("BackendConfig.timeout_sec must be None or an integer >= 1")
-    if not isinstance(cfg.package_manager, str):
-        raise ValueError("BackendConfig.package_manager must be a string")
-    if cfg.package_manager not in ("uv", "pixi"):
-        raise ValueError(f"Unsupported package manager: {cfg.package_manager}")
     if not isinstance(cfg.data_dirs, (tuple, list)):
         raise ValueError("BackendConfig.data_dirs must be a tuple or list of relative paths")
     for data_dir in cfg.data_dirs:

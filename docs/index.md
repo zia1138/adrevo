@@ -8,14 +8,14 @@ For the quickstart, custom-project overview, adaptive backtracking, and benchmar
 
 An adrevo project contains `main.py`, `evaluate.py`, `config.py` (or a `config_*.py` variant), and `pyproject.toml`.
 
-- `main.py`: your initial algorithm; adrevo replaces this file.
-- `evaluate.py`: validates `main.py` and writes `results.json`.
+- `main.py`: evolved candidate code; it writes a benchmark-defined output file.
+- `evaluate.py`: trusted code that runs the candidate, validates its output, and writes `results.json`.
 - `config.py`: defines `get_adrevo_config()` and `get_backend_config()`.
-- `pyproject.toml`: declares the dependencies used by the algorithm and evaluator.
+- `pyproject.toml`: declares dependencies for the trusted evaluator.
 
 `results.json` must contain `correct` (boolean), `error` (string or `null`), and `combined_score` (number). Higher scores are better. The current execution backend invokes `evaluate.py` by name.
 
-`uv sync` creates the Adrevo environment from the repository's root `pyproject.toml`. Each evolution project manages its own evaluator environment: create its `pyproject.toml` with `uv init`, add packages with `uv add PACKAGE`, and adrevo will execute its evaluator with `uv run`.
+Adrevo uses the repository's `uv` environment; each evolution project has a separate `uv` environment for its trusted evaluator. The evaluator can build and run the evolved candidate with any runtime or package manager, then validate its output file. Only trusted `results.json` returns to Adrevo.
 
 ## Configuration
 
@@ -25,7 +25,7 @@ Configuration is Python. Construct the dataclasses and override only the default
 |---|---|
 | `ModelSpec` | `model_id`, Pydantic AI `model`, `settings`, token costs, concurrency leases, model turns |
 | `AdrevoConfig` | model builder, task prompt, workers, generations, cost limit, backtracking, strategies |
-| `BackendConfig` | timeout, `uv`/`pixi`, immutable data directories |
+| `BackendConfig` | timeout, uv evaluator environment, immutable data directories |
 
 `build_evo_models()` returns one or more ordered `ModelSpec`s. Adrevo tries the next model after a failed attempt; after the final model fails, it may backtrack. Use [Pydantic AI's model API](https://pydantic.dev/docs/ai/models/overview). See the [example config](https://github.com/zia1138/adrevo/blob/main/examples/circle_packing/config_openai.py) and [all config fields](https://github.com/zia1138/adrevo/blob/main/src/adrevo/config.py).
 

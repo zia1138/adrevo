@@ -1,11 +1,14 @@
 """Evaluator for circle packing (n=26 circles in a unit square)."""
 
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
-from main import run_packing
 
 N = 26
+OUTPUT_FILE = Path("circle_packing.json")
 
 
 def validate_packing(centers, radii, atol=1e-10):
@@ -44,15 +47,25 @@ def validate_packing(centers, radii, atol=1e-10):
 
 
 if __name__ == "__main__":
-    centers, radii, reported_sum = run_packing()
-    is_valid, error_msg = validate_packing(centers, radii)
+    try:
+        OUTPUT_FILE.unlink(missing_ok=True)
+        subprocess.run([sys.executable, "main.py"], check=True, timeout=60)
 
-    sum_radii = float(np.sum(radii)) if is_valid else 0.0
+        payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+        is_valid, error_msg = validate_packing(
+            payload["centers"], payload["radii"]
+        )
+        sum_radii = float(np.sum(payload["radii"])) if is_valid else 0.0
+        result = {
+            "correct": is_valid,
+            "error": error_msg,
+            "combined_score": sum_radii,
+        }
+    except Exception as exc:
+        result = {
+            "correct": False,
+            "error": str(exc),
+            "combined_score": 0.0,
+        }
 
-    result = {
-        "correct": is_valid,
-        "error": error_msg,
-        "combined_score": sum_radii,
-    }
-    with open("results.json", "w") as f:
-        json.dump(result, f, indent=4)
+    Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")
