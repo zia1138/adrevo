@@ -19,7 +19,6 @@ from adrevo.database import Program, ProgramDatabase
 from adrevo.ray_backend import RayExecutionBackend
 from adrevo.utils import (
     extract_file_to_string,
-    extract_last_code_fence,
     extract_last_code_fence_for_language,
 )
 
@@ -32,10 +31,8 @@ class ModelResponseKind(Enum):
     # LLM call itself; this enum says how to parse and handle that call's output.
     # CODE_UPDATE -> replacement code to evaluate.
     # DIAGNOSE -> diagnostic code to run, then feed back into CODE_UPDATE.
-    # CONSIDER_PACKAGES -> package names to install, then return to CODE_UPDATE.
     CODE_UPDATE = "code_update"
     DIAGNOSE = "diagnose"
-    CONSIDER_PACKAGES = "consider_packages"
 
 
 @dataclass
@@ -79,7 +76,7 @@ class ParentRunContext:
     parent_zip_bytes: bytes
     # Evaluation file contents included in the initial model prompt.
     eval_code: str
-    # Project zip used for evaluation. Package installation can update this.
+    # Project zip used for evaluation.
     current_zip_bytes: bytes
     # Cached parent score and start time used for feedback and DB metadata.
     parent_score: float
@@ -108,11 +105,9 @@ class ModelSession:
     # Full conversation history returned by pydantic-ai. This is what keeps every
     # LLM turn in this selected model session connected to earlier feedback.
     message_history: Any = None
-    # Counts failed code-update evaluations since the last detour. Diagnostic
-    # and package-selection LLM calls reset this because they add new context.
+    # Counts failed code-update evaluations since the last diagnostic detour.
     consecutive_code_update_failures: int = 0
-    # Raw fenced text extracted from the response that just came back. Depending
-    # on the scheduled turn, this may be source or a package-selection block.
+    # Raw source extracted from the response that just came back.
     turn_payload: str | None = None
     # Evaluation feedback from the accepted code update, kept so an optional
     # final summary turn can ask the same LLM what strategy worked.
@@ -607,10 +602,7 @@ class AdrevoWorker:
                     # this turn. The response kind decides which fence/parser is
                     # valid; a malformed reply schedules a repair prompt instead.
                     session.turn_payload = None
-                    session.turn_payload = self._extract_turn_payload(
-                        response.output,
-                        session,
-                    )
+                    session.turn_payload = self._extract_turn_payload(response.output)
                 except ValueError as exc:
                     session.scheduled_turn = ScheduledTurn(
                         prompt=self._format_missing_fence_prompt(
@@ -759,23 +751,6 @@ class AdrevoWorker:
             session.consecutive_code_update_failures = 0
             return None
 
-        # A package-selection response is another detour: the model proposes
-        # dependencies, we update the environment if needed, then schedule the
-        # next turn as CODE_UPDATE.
-        if (
-            session.scheduled_turn.expected_response
-            == ModelResponseKind.CONSIDER_PACKAGES
-        ):
-            session.scheduled_turn = ScheduledTurn(
-                prompt=self._consider_packages(
-                    context,
-                    session.turn_payload,
-                ),
-                expected_response=ModelResponseKind.CODE_UPDATE,
-            )
-            session.consecutive_code_update_failures = 0
-            return None
-
         # Code-update responses are the only turns that can produce a program
         # eligible for evaluation and database insertion.
         improved, feedback_prompt = self._evaluate_code_update(
@@ -790,7 +765,7 @@ class AdrevoWorker:
 
         # A failed code update stays in the same LLM conversation. Scheduling the
         # next turn chooses whether the same LLM should revise directly or first
-        # produce diagnostic/package information.
+        # produce diagnostic information.
         session.consecutive_code_update_failures += 1
         self._schedule_next_turn(
             context,
@@ -826,20 +801,6 @@ class AdrevoWorker:
         # A detour only helps if there is still one turn for the detour itself
         # and another turn afterward for the final code update.
         can_take_detour = turns_remaining >= 2
-
-        if can_take_detour and random.random() < self.evo_config.pr_package_install:
-            # After repeated failures, optionally ask the same LLM whether the
-            # environment is missing a useful dependency before it writes more code.
-            installed_packages = self._list_installed_packages(context)
-            session.scheduled_turn = ScheduledTurn(
-                prompt=self._format_package_selection_prompt(
-                    context,
-                    installed_packages,
-                ),
-                expected_response=ModelResponseKind.CONSIDER_PACKAGES,
-            )
-            session.consecutive_code_update_failures = 0
-            return
 
         if can_take_detour and self.evo_config.use_probe:
             # Otherwise use the next turn to gather evidence. The diagnostic run
@@ -981,144 +942,6 @@ class AdrevoWorker:
             include_strategy=False,
         )
 
-    def _consider_packages(
-        self,
-        context: ParentRunContext,
-        package_response: str,
-    ) -> str:
-        installed_packages = self._list_installed_packages(context)
-        suggested_packages = self._parse_package_suggestions(
-            installed_packages,
-            package_response,
-        )
-        return self._install_packages(context, suggested_packages)
-
-    def _list_installed_packages(self, context: ParentRunContext) -> str:
-        python_cmd = [
-            "python",
-            "-c",
-            textwrap.dedent("""
-            import importlib.metadata
-
-            package_names = sorted(
-                {
-                    dist.metadata.get("Name")
-                    for dist in importlib.metadata.distributions()
-                    if dist.metadata.get("Name")
-                }
-            )
-            print(" ".join(package_names))
-            """),
-        ]
-        cmd = ["uv", "run", "--project", ".", *python_cmd]
-
-        result = self.backend.run_command(
-            parent_zip_bytes=context.current_zip_bytes,
-            cmd=cmd,
-            preempt_db=self.db,
-            preempt_claim_id=context.claim_id,
-        )
-        self._raise_if_result_preempted_or_stale(context, result, "Package listing")
-        if result["returncode"] == 0:
-            pkg_names = result["stdout"].split()
-            return "```\n" + "\n".join(pkg_names) + "\n```"
-        return (
-            "Failed to list packages: "
-            f"{result.get('stderr') or result.get('stderr_log') or 'Unknown error'}"
-        )
-
-    def _parse_package_suggestions(
-        self,
-        installed_packages: str,
-        package_response: str,
-    ) -> list[str]:
-        try:
-            pkg_block = extract_last_code_fence(package_response).strip()
-        except ValueError:
-            pkg_block = package_response.strip()
-
-        normalized_lines = [
-            line.strip() for line in pkg_block.splitlines() if line.strip()
-        ]
-        if len(normalized_lines) == 1 and normalized_lines[0].upper() == "NONE":
-            return []
-
-        packages: list[str] = []
-        for line in normalized_lines:
-            cleaned = line.lstrip("-*0123456789. ").strip()
-            if cleaned:
-                packages.extend(token for token in cleaned.split() if token)
-
-        try:
-            installed_pkg_block = extract_last_code_fence(installed_packages).strip()
-        except ValueError:
-            installed_pkg_block = installed_packages
-
-        installed_package_names = {
-            line.strip()
-            for line in installed_pkg_block.splitlines()
-            if line.strip()
-        }
-        return [pkg for pkg in packages if pkg not in installed_package_names]
-
-    def _install_packages(
-        self,
-        context: ParentRunContext,
-        package_names: list[str],
-    ) -> str:
-        next_code_update_prompt = self._format_code_update_prompt(
-            context,
-            f"Now write a complete replacement for `{self.evo_config.evo_file}` "
-            f"that improves on the parent score of {context.parent_score}. "
-            "If additional packages were installed successfully, you may import and use them.",
-        )
-
-        if not package_names:
-            return textwrap.dedent("""
-                No additional packages were selected. Skipped `uv add`.
-                {next_code_update_prompt}
-            """).format(
-                next_code_update_prompt=next_code_update_prompt,
-            ).strip()
-
-        install_cmd = ["uv", "add", *package_names]
-        results, updated_zip = self.backend.run_command_with_zip(
-            parent_zip_bytes=context.current_zip_bytes,
-            cmd=install_cmd,
-            preempt_db=self.db,
-            preempt_claim_id=context.claim_id,
-        )
-        self._raise_if_result_preempted_or_stale(
-            context,
-            results,
-            "Package installation",
-        )
-        returncode = results.get("returncode")
-        if returncode == 0:
-            context.current_zip_bytes = updated_zip
-            return (
-                "Installed additional packages successfully.\n"
-                + "Command: `"
-                + " ".join(install_cmd)
-                + "`\n"
-                + "Packages added: "
-                + " ".join(package_names)
-                + "\n"
-                + next_code_update_prompt
-            )
-
-        stderr = results.get("stderr_log", "").strip()
-        return (
-            "Failed to install suggested packages.\n"
-            + "Command: `"
-            + " ".join(install_cmd)
-            + "`\n"
-            + "Error: "
-            + (stderr or "Unknown error")
-            + "\n"
-            + next_code_update_prompt
-        )
-
     def _acquire_or_wait_for_model(
         self,
         context: ParentRunContext,
@@ -1226,7 +1049,7 @@ class AdrevoWorker:
             ```
 
             Preserve the existing input, output, and entrypoint behavior.
-            You may use helper functions and import packages as needed.
+            Use only dependencies already declared by the candidate project.
             You have at most {max_model_turns} model turns total, including this one.
             Learn from feedback and revise accordingly.
         """).format(
@@ -1301,47 +1124,6 @@ class AdrevoWorker:
 
         return prompt + "\n\n" + response_instruction
 
-    def _format_package_selection_prompt(
-        self,
-        context: ParentRunContext,
-        installed_packages: str,
-    ) -> str:
-        return textwrap.dedent("""
-            Learn from the full prior conversation and decide whether any additional packages
-            should be installed before the next code update for `{evo_file}`.
-
-            The currently installed packages are:
-            {installed_packages}
-
-            First, briefly assess in free-form text whether new packages would materially help. You may mention possible packages,
-            what they would be used for, and why they are or are not worth installing.
-
-            Then end your response with one final plain triple-backtick code fence containing the exact package install list.
-
-            Final fence format:
-            ```
-            NONE
-            ```
-            or
-            ```
-            package1
-            package2
-            package3
-            ```
-
-            Rules for the final fence:
-            - The final fence must be the last triple-backtick block in your response.
-            - Only packages inside the final fence will be installed.
-            - Put one package name per line when suggesting packages.
-            - Do not include bullets, numbering, commas, explanations, import names, or prose inside the final fence.
-            - Return `NONE` if no additional packages are clearly useful.
-            - Suggest only new packages that are not already installed and are likely to help produce a stronger solution.
-            - Do not generate code in this step. This step is only for package selection.
-        """).format(
-            evo_file=self.evo_config.evo_file,
-            installed_packages=installed_packages,
-        ).strip()
-
     def _format_success_summary_prompt(self, session: ModelSession) -> str:
         return textwrap.dedent("""
             A new program has been accepted.
@@ -1370,14 +1152,7 @@ class AdrevoWorker:
             feedback_prompt=session.last_evaluation_feedback or "No program evaluation feedback is available.",
         ).strip()
 
-    def _extract_turn_payload(
-        self,
-        response_text: str,
-        session: ModelSession,
-    ) -> str:
-        response_kind = session.scheduled_turn.expected_response
-        if response_kind == ModelResponseKind.CONSIDER_PACKAGES:
-            return extract_last_code_fence(response_text)
+    def _extract_turn_payload(self, response_text: str) -> str:
         return extract_last_code_fence_for_language(
             response_text,
             self.evo_config.lang_identifier,
@@ -1390,18 +1165,10 @@ class AdrevoWorker:
         exc: ValueError,
     ) -> str:
         response_kind = session.scheduled_turn.expected_response
-        if response_kind in {ModelResponseKind.CODE_UPDATE, ModelResponseKind.DIAGNOSE}:
-            fence_requirement = f"a ```{self.evo_config.lang_identifier}``` code fence"
-        else:
-            fence_requirement = "a plain triple-backtick code fence containing `NONE` or one package name per line"
-            retry_instruction = textwrap.dedent("""
-                Return only one plain triple-backtick code fence containing either `NONE` or one package name per line.
-                Do not include any explanation or prose.
-            """).strip()
+        fence_requirement = f"a ```{self.evo_config.lang_identifier}``` code fence"
         response_label = {
             ModelResponseKind.CODE_UPDATE: "code update",
             ModelResponseKind.DIAGNOSE: "diagnostic code",
-            ModelResponseKind.CONSIDER_PACKAGES: "package selection",
         }[response_kind]
         prompt = textwrap.dedent("""
             Your previous response did not include {fence_requirement} for the {response_label} response.
@@ -1421,7 +1188,7 @@ class AdrevoWorker:
                 context,
                 prompt,
             )
-        return prompt + "\n" + retry_instruction
+        raise RuntimeError(f"Unexpected response kind: {response_kind}")
 
     def _append_captured_output(
         self,

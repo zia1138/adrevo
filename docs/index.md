@@ -36,6 +36,8 @@ There are three independent environments:
 - **Trusted evaluator:** your root project's `pyproject.toml` defines the uv environment that runs `evaluate.py`. It is separate from Adrevo's controller dependencies.
 - **Candidate:** `evaluate.py` chooses how to build and run `evo/`: uv, Cargo, Go, Node, Docker, or another runtime.
 
+Manage dependencies for evolved code in `evo/` yourself—for example, in `evo/pyproject.toml`. Adrevo does not install or list them.
+
 The Ray backend runs the evaluator with `uv -q run --project . python evaluate.py`. A Python evaluator can run a uv-based candidate with, for example:
 
 ```python

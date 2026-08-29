@@ -45,7 +45,6 @@ class AdrevoConfig:
         dl_evostate_freq: Frequency (in seconds) to download evo state from workers and database.
         model_wait_poll_sec: Frequency (in seconds) to poll for model availability (limited by leases).
         code_update_failures_before_diagnostics: Number of consecutive code update failures before running diagnostics.
-        pr_package_install: Probability of installing a package in the environment.
         strategies: Tuple of strategy names to use for evolution.
         pr_no_strategy: Probability of not using any strategy.
         pr_strategies: Tuple of probabilities for each strategy in strategies.
@@ -63,7 +62,6 @@ class AdrevoConfig:
     dl_evostate_freq: float = 30
     model_wait_poll_sec: float = 2.0
     code_update_failures_before_diagnostics: int = 2
-    pr_package_install: float = 0.01
     strategies: tuple = ()
     pr_no_strategy: float = 1.0
     pr_strategies: tuple = ()

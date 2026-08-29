@@ -44,6 +44,8 @@ There are three environments:
 - **Evaluator:** your root project's `pyproject.toml` and `uv` environment run trusted `evaluate.py`, separately from Adrevo's controller dependencies.
 - **Candidate:** `evo/` is built and run by the evaluator with uv, Cargo, Go, Node, Docker, or another runtime.
 
+Manage dependencies for evolved code in `evo/` yourself—for example, in `evo/pyproject.toml`. Adrevo does not install or list them.
+
 Each evaluation follows this contract:
 
 1. Adrevo copies the project, replaces the configured `evo_file`, and runs `evaluate.py` in the `uv` environment you specified for the trusted evaluator.
