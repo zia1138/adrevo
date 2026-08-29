@@ -1,10 +1,14 @@
 """Evaluator for the Real-Time Adaptive Signal Processing Algorithm."""
 
 import json
+import subprocess
+from pathlib import Path
 
 import numpy as np
 from scipy.stats import pearsonr
-from main import run_signal_processing
+
+INPUT_FILE = Path("evo/signal_processing_input.json")
+OUTPUT_FILE = Path("evo/signal_processing.json")
 
 
 def safe_float(value):
@@ -111,18 +115,33 @@ def generate_test_signals(num_signals=5):
 
 if __name__ == "__main__":
     test_signals = generate_test_signals(5)
+    try:
+        OUTPUT_FILE.unlink(missing_ok=True)
+        INPUT_FILE.write_text(
+            json.dumps({
+                "noisy_signals": [signal.tolist() for signal, _ in test_signals],
+                "window_size": 20,
+            }),
+            encoding="utf-8",
+        )
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        candidate_outputs = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["filtered_signals"]
+        if len(candidate_outputs) != len(test_signals):
+            raise ValueError("Candidate returned the wrong number of filtered signals")
+    except Exception as exc:
+        Path("results.json").write_text(
+            json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4),
+            encoding="utf-8",
+        )
+        raise SystemExit
+
     all_scores = []
     all_metrics = []
     successful_runs = 0
 
-    for i, (noisy_signal, clean_signal) in enumerate(test_signals):
+    for (noisy_signal, clean_signal), candidate_output in zip(test_signals, candidate_outputs):
         try:
-            result = run_signal_processing(noisy_signal=noisy_signal, window_size=20)
-
-            if not isinstance(result, dict) or "filtered_signal" not in result:
-                continue
-
-            filtered_signal = np.array(result["filtered_signal"])
+            filtered_signal = np.array(candidate_output)
             if len(filtered_signal) == 0:
                 continue
 
@@ -195,5 +214,4 @@ if __name__ == "__main__":
             "combined_score": safe_float(overall_score),
         }
 
-    with open("results.json", "w") as f:
-        json.dump(result, f, indent=4)
+    Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")

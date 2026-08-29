@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import numpy as np
 
 
@@ -13,3 +16,9 @@ def heilbronn_convex13() -> np.ndarray:
     rng = np.random.default_rng(seed=42)
     points = rng.random((n, 2))
     return points
+
+
+if __name__ == "__main__":
+    Path("heilbronn_convex_13.json").write_text(
+        json.dumps({"points": heilbronn_convex13().tolist()}), encoding="utf-8"
+    )

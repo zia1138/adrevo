@@ -1,15 +1,17 @@
 """Evaluator for packing 21 circles in a rectangle of perimeter 4."""
 
 import json
+import subprocess
+from pathlib import Path
 
 import numpy as np
-from main import circle_packing21
 
 
 NUM_CIRCLES = 21
 TOL = 1e-6
 # If width + height <= 2, then 4r <= 2 for every contained circle.
 MAX_RADIUS = 0.5
+OUTPUT_FILE = Path("evo/circle_packing_rect.json")
 
 
 def _as_float_array(candidate):
@@ -114,8 +116,10 @@ def evaluate_candidate(candidate):
 
 if __name__ == "__main__":
     try:
-        candidate = circle_packing21()
-        is_valid, error_msg, combined_score = evaluate_candidate(candidate)
+        OUTPUT_FILE.unlink(missing_ok=True)
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+        is_valid, error_msg, combined_score = evaluate_candidate(payload["circles"])
     except Exception as exc:
         is_valid = False
         error_msg = f"Submission raised {type(exc).__name__}: {exc}"
@@ -126,6 +130,5 @@ if __name__ == "__main__":
         "error": error_msg,
         "combined_score": combined_score,
     }
-    with open("results.json", "w") as f:
-        # Refuse JavaScript's non-standard NaN and Infinity spellings.
-        json.dump(result, f, indent=4, allow_nan=False)
+    # Refuse JavaScript's non-standard NaN and Infinity spellings.
+    Path("results.json").write_text(json.dumps(result, indent=4, allow_nan=False), encoding="utf-8")

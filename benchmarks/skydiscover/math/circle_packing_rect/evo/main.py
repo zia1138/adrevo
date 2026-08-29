@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import numpy as np
 
 
@@ -14,3 +17,9 @@ def circle_packing21() -> np.ndarray:
     circles = np.zeros((n, 3))
 
     return circles
+
+
+if __name__ == "__main__":
+    Path("circle_packing_rect.json").write_text(
+        json.dumps({"circles": circle_packing21().tolist()}), encoding="utf-8"
+    )

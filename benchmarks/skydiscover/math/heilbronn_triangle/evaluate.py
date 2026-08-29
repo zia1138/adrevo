@@ -2,12 +2,14 @@
 
 import json
 import itertools
+import subprocess
+from pathlib import Path
 
 import numpy as np
-from main import heilbronn_triangle11
 
 NUM_POINTS = 11
 TOL = 1e-6
+OUTPUT_FILE = Path("evo/heilbronn_triangle.json")
 
 
 def triangle_area(a, b, c):
@@ -25,7 +27,13 @@ def check_inside_triangle(points, tol=1e-6):
 
 
 if __name__ == "__main__":
-    points = heilbronn_triangle11()
+    try:
+        OUTPUT_FILE.unlink(missing_ok=True)
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        points = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["points"]
+    except Exception as exc:
+        Path("results.json").write_text(json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4), encoding="utf-8")
+        raise SystemExit
 
     if not isinstance(points, np.ndarray):
         points = np.array(points)
@@ -55,5 +63,4 @@ if __name__ == "__main__":
         "error": error_msg,
         "combined_score": combined_score,
     }
-    with open("results.json", "w") as f:
-        json.dump(result, f, indent=4)
+    Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")

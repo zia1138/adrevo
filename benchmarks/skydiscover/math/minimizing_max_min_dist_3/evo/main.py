@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import numpy as np
 
 
@@ -15,3 +18,9 @@ def min_max_dist_dim3_14() -> np.ndarray:
     points = np.random.randn(n, d)
 
     return points
+
+
+if __name__ == "__main__":
+    Path("minimizing_max_min_dist_3.json").write_text(
+        json.dumps({"points": min_max_dist_dim3_14().tolist()}), encoding="utf-8"
+    )

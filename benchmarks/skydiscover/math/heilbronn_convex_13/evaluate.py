@@ -2,19 +2,27 @@
 
 import json
 import itertools
+import subprocess
+from pathlib import Path
 
 import numpy as np
 from scipy.spatial import ConvexHull
-from main import heilbronn_convex13
 
 #BENCHMARK = 0.030936889034895654
 NUM_POINTS = 13
+OUTPUT_FILE = Path("evo/heilbronn_convex_13.json")
 def triangle_area(p1, p2, p3):
     return abs(p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1]) + p3[0] * (p1[1] - p2[1])) / 2
 
 
 if __name__ == "__main__":
-    points = heilbronn_convex13()
+    try:
+        OUTPUT_FILE.unlink(missing_ok=True)
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        points = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["points"]
+    except Exception as exc:
+        Path("results.json").write_text(json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4), encoding="utf-8")
+        raise SystemExit
 
     if not isinstance(points, np.ndarray):
         points = np.array(points)
@@ -47,5 +55,4 @@ if __name__ == "__main__":
         "error": error_msg,
         "combined_score": combined_score,
     }
-    with open("results.json", "w") as f:
-        json.dump(result, f, indent=4)
+    Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")

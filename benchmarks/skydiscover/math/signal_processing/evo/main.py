@@ -1,6 +1,7 @@
-"""
-Real-Time Adaptive Signal Processing Algorithm for Non-Stationary Time Series
-"""
+"""Real-Time Adaptive Signal Processing Algorithm for Non-Stationary Time Series."""
+import json
+from pathlib import Path
+
 import numpy as np
 
 
@@ -124,3 +125,17 @@ def run_signal_processing(noisy_signal=None, signal_length=1000, noise_level=0.3
             "noise_reduction": noise_reduction,
             "signal_length": min_length,
         }
+
+
+if __name__ == "__main__":
+    input_payload = json.loads(Path("signal_processing_input.json").read_text(encoding="utf-8"))
+    filtered_signals = []
+    for noisy_signal in input_payload["noisy_signals"]:
+        result = run_signal_processing(
+            noisy_signal=np.asarray(noisy_signal, dtype=float),
+            window_size=input_payload["window_size"],
+        )
+        filtered_signals.append(np.asarray(result["filtered_signal"]).tolist())
+    Path("signal_processing.json").write_text(
+        json.dumps({"filtered_signals": filtered_signals}), encoding="utf-8"
+    )

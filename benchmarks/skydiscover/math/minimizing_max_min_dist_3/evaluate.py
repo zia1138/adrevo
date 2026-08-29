@@ -1,15 +1,23 @@
 """Evaluator for minimizing max/min distance ratio (dim=3, 14 points)."""
 
 import json
+import subprocess
+from pathlib import Path
 
 import numpy as np
 import scipy.spatial.distance
-from main import min_max_dist_dim3_14
 
 NUM_POINTS = 14
 DIMENSION = 3
+OUTPUT_FILE = Path("evo/minimizing_max_min_dist_3.json")
 if __name__ == "__main__":
-    points = min_max_dist_dim3_14()
+    try:
+        OUTPUT_FILE.unlink(missing_ok=True)
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        points = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["points"]
+    except Exception as exc:
+        Path("results.json").write_text(json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4), encoding="utf-8")
+        raise SystemExit
 
     if not isinstance(points, np.ndarray):
         points = np.array(points)
@@ -40,5 +48,4 @@ if __name__ == "__main__":
         "error": error_msg,
         "combined_score": combined_score,
     }
-    with open("results.json", "w") as f:
-        json.dump(result, f, indent=4)
+    Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")

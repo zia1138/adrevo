@@ -1,6 +1,8 @@
 """Constructor-based circle packing for n=26 circles"""
 
+import json
 import random
+from pathlib import Path
 import numpy as np
 
 
@@ -88,3 +90,11 @@ def run_packing():
     # Calculate the sum of radii
     sum_radii = np.sum(radii)
     return centers, radii, sum_radii
+
+
+if __name__ == "__main__":
+    centers, radii, _ = run_packing()
+    Path("circle_packing.json").write_text(
+        json.dumps({"centers": centers.tolist(), "radii": radii.tolist()}),
+        encoding="utf-8",
+    )

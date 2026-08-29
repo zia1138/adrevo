@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import numpy as np
 
 
@@ -12,3 +15,9 @@ def heilbronn_triangle11() -> np.ndarray:
     n = 11
     points = np.zeros((n, 2))
     return points
+
+
+if __name__ == "__main__":
+    Path("heilbronn_triangle.json").write_text(
+        json.dumps({"points": heilbronn_triangle11().tolist()}), encoding="utf-8"
+    )
