@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Download CSV datasets for the LLM-SQL benchmark.
 #
-# Required files (placed in datasets/):
+# Required files (placed in evo/datasets/):
 #   movies.csv    - Rotten Tomatoes movie reviews (~9 MB)
 #   beer.csv      - Beer review dataset (~2.5 MB)
 #   BIRD.csv      - BIRD text-to-SQL dataset (~34 MB)
@@ -19,12 +19,12 @@ BASE_URL="https://huggingface.co/datasets/f20180301/adrs-data/resolve/main/llm_s
 
 echo "Downloading LLM-SQL benchmark datasets..."
 
-mkdir -p datasets
+mkdir -p evo/datasets
 for dataset in movies.csv beer.csv BIRD.csv PDMX.csv products.csv; do
-    echo "  Downloading datasets/${dataset}..."
-    wget -q --show-progress -O "datasets/${dataset}" "${BASE_URL}/datasets/${dataset}"
+    echo "  Downloading evo/datasets/${dataset}..."
+    wget -q --show-progress -O "evo/datasets/${dataset}" "${BASE_URL}/datasets/${dataset}"
 done
 
 echo ""
 echo "Done. Downloaded files:"
-ls -lh datasets/*.csv
+ls -lh evo/datasets/*.csv

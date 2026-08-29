@@ -90,4 +90,4 @@ def get_adrevo_config() -> AdrevoConfig:
     )
 
 def get_backend_config() -> BackendConfig:
-    return BackendConfig(timeout_sec=240, data_dirs=("datasets",))
+    return BackendConfig(timeout_sec=240, data_dirs=("evo/datasets",))

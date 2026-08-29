@@ -2,13 +2,15 @@
 
 import json
 import os
+import subprocess
+import sys
 import traceback
 from pathlib import Path
 from typing import Dict, List
+from types import SimpleNamespace
 
 import networkx as nx
 import pandas as pd
-from main import search_algorithm
 
 
 def make_reference_graph(cost_path=None, throughput_path=None, num_vms=1):
@@ -328,11 +330,18 @@ if __name__ == "__main__":
                 terminal_nodes = config["dest_nodes"]
                 num_partitions = config["num_partitions"]
 
-                # Candidate code receives a disposable copy. Validation and
-                # scoring retain the untouched evaluator-owned graph.
-                bc_t = search_algorithm(
-                    source_node, terminal_nodes, reference_graph.copy(), num_partitions
-                )
+                input_path = Path("evo/input.json")
+                output_path = Path("evo/output.json")
+                output_path.unlink(missing_ok=True)
+                input_path.write_text(json.dumps({
+                    "source_node": source_node,
+                    "terminal_nodes": terminal_nodes,
+                    "num_partitions": num_partitions,
+                    "edges": [[src, dst, dict(data)] for src, dst, data in reference_graph.edges(data=True)],
+                }), encoding="utf-8")
+                subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+                candidate_output = json.loads(output_path.read_text(encoding="utf-8"))
+                bc_t = SimpleNamespace(**candidate_output)
 
                 is_valid, validation_error = validate_broadcast_topology(
                     bc_t, source_node, terminal_nodes, num_partitions, reference_graph

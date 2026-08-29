@@ -112,79 +112,21 @@ def validate_schedule(txn_seq, expected_size):
 
 
 def run_with_timeout(timeout_seconds=600):
-    """Run the program in a separate process with timeout."""
-    eval_dir = os.path.dirname(os.path.abspath(__file__))
-    with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp_file:
-        script = f"""
-import sys
-import os
-import json
-import traceback
-
-sys.path.insert(0, r'{eval_dir}')
-
-try:
-    from main import get_schedules
-    schedules = get_schedules()
-
-    results = {{
-        'schedules': schedules,
-    }}
-
-    with open({temp_file.name!r} + '.results', 'w') as f:
-        json.dump(results, f)
-
-except Exception as e:
-    traceback.print_exc()
-    with open({temp_file.name!r} + '.results', 'w') as f:
-        json.dump({{'error': str(e)}}, f)
-"""
-        temp_file.write(script.encode())
-        temp_file_path = temp_file.name
-
-    results_path = f"{temp_file_path}.results"
-
-    try:
-        process = subprocess.Popen(
-            [sys.executable, temp_file_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        try:
-            stdout, stderr = process.communicate(timeout=timeout_seconds)
-            exit_code = process.returncode
-
-            print(f"Subprocess stdout: {stdout.decode()}")
-            if stderr:
-                print(f"Subprocess stderr: {stderr.decode()}")
-
-            if exit_code != 0:
-                raise RuntimeError(f"Process exited with code {exit_code}")
-
-            if os.path.exists(results_path):
-                with open(results_path) as f:
-                    results = json.load(f)
-
-                if "error" in results:
-                    raise RuntimeError(f"Program execution failed: {results['error']}")
-
-                if set(results) != {"schedules"}:
-                    raise RuntimeError("Invalid result format")
-                return results["schedules"]
-            else:
-                raise RuntimeError("Results file not found")
-
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-            raise TimeoutError(f"Process timed out after {timeout_seconds} seconds")
-
-    finally:
-        if os.path.exists(temp_file_path):
-            os.unlink(temp_file_path)
-        if os.path.exists(results_path):
-            os.unlink(results_path)
+    """Run the candidate in its own environment and return its JSON artifact."""
+    input_path = os.path.join("evo", "input.json")
+    output_path = os.path.join("evo", "output.json")
+    with open(input_path, "w") as f:
+        json.dump({"workloads": [WORKLOAD_1, WORKLOAD_2, WORKLOAD_3]}, f)
+    subprocess.run(
+        ["uv", "run", "--directory", "evo", "python", "main.py"],
+        check=True,
+        timeout=timeout_seconds,
+    )
+    with open(output_path) as f:
+        results = json.load(f)
+    if set(results) != {"schedules"}:
+        raise RuntimeError("Invalid result format")
+    return results["schedules"]
 
 
 if __name__ == "__main__":

@@ -8,9 +8,10 @@ from typing import List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
-from main import Evolved
 
 import warnings
+import subprocess
+from pathlib import Path
 
 warnings.filterwarnings(
     "ignore",
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     try:
         # Dataset configuration
         eval_dir = os.path.dirname(os.path.abspath(__file__))
-        datasets_dir = os.path.join(eval_dir, "datasets")
+        datasets_dir = os.path.join(eval_dir, "evo/datasets")
 
         test_files = [
             os.path.join(datasets_dir, "movies.csv"),
@@ -102,12 +103,27 @@ if __name__ == "__main__":
             [['product_title', 'parent_asin']],
         ]
 
+        input_path = Path("evo/input.json")
+        output_path = Path("evo/output.json")
+        output_path.unlink(missing_ok=True)
+        input_path.write_text(json.dumps({"requests": [
+            {
+                "input_file": f"datasets/{os.path.basename(filename)}",
+                "output_file": os.path.basename(filename),
+                "options": {"early_stop": 100000, "distinct_value_threshold": 0.7, "row_stop": 4, "col_stop": 2, "col_merge": col_merge},
+            }
+            for filename, col_merge in zip(test_files, col_merges)
+            if os.path.exists(filename)
+        ]}), encoding="utf-8")
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        candidate_runtimes = json.loads(output_path.read_text(encoding="utf-8"))["runtimes"]
+
         failed_files = 0
         hit_rates = []
         total_runtime = 0.0
         successful_files = 0
 
-        for filename, col_merge in zip(test_files, col_merges):
+        for index, (filename, col_merge) in enumerate(zip(test_files, col_merges)):
             try:
                 if not os.path.exists(filename):
                     print(f"Dataset not found: {filename}, skipping...")
@@ -120,16 +136,8 @@ if __name__ == "__main__":
                 total_chars_before = master_df.astype(str).apply(lambda x: x.str.len().sum(), axis=1).sum()
                 original_row_count = len(master_df)
 
-                st = time.time()
-                reordered, _ = Evolved().reorder(
-                    master_df,
-                    early_stop=100000,
-                    distinct_value_threshold=0.7,
-                    row_stop=4,
-                    col_stop=2,
-                    col_merge=col_merge,
-                )
-                runtime = time.time() - st
+                reordered = pd.read_csv(Path("evo/outputs") / os.path.basename(filename))
+                runtime = candidate_runtimes[index]
 
                 # Validate row count
                 reordered_row_count = len(reordered)

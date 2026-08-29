@@ -1,8 +1,8 @@
 import random
 import collections
 import json
+from pathlib import Path
 
-from workloads import WORKLOAD_1, WORKLOAD_2, WORKLOAD_3
 
 
 # ---------- Workload simulator (from txn_simulator.py) ----------
@@ -269,5 +269,6 @@ def get_schedules():
 
 
 if __name__ == "__main__":
-    schedules = get_schedules()
-    print(f"Schedules: {schedules}")
+    payload = json.loads(Path("input.json").read_text(encoding="utf-8"))
+    schedules = [get_best_schedule(Workload(workload), 10) for workload in payload["workloads"]]
+    Path("output.json").write_text(json.dumps({"schedules": schedules}), encoding="utf-8")

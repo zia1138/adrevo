@@ -8,6 +8,10 @@ The rearrangement algorithm is adapted from
 [DeepSeek EPLB](https://github.com/deepseek-ai/eplb).
 """
 
+import json
+from pathlib import Path
+import time
+
 import torch
 
 
@@ -216,3 +220,13 @@ def rebalance_experts(
 
 
 __all__ = ["rebalance_experts"]
+
+
+if __name__ == "__main__":
+    payload = json.loads(Path("input.json").read_text(encoding="utf-8"))
+    outputs = []
+    for workload in payload["workloads"]:
+        start = time.perf_counter()
+        phy2log, log2phy, logcnt = rebalance_experts(torch.tensor(workload), **payload["parameters"])
+        outputs.append({"phy2log": phy2log.tolist(), "log2phy": log2phy.tolist(), "logcnt": logcnt.tolist(), "runtime": time.perf_counter() - start})
+    Path("output.json").write_text(json.dumps({"outputs": outputs}), encoding="utf-8")

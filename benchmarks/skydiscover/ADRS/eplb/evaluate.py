@@ -5,9 +5,10 @@ import functools
 import time
 import traceback
 import os
+import subprocess
+from pathlib import Path
 
 import torch
-from main import rebalance_experts
 
 
 # ---------- Constants ----------
@@ -93,21 +94,27 @@ def simulate_inference(
 if __name__ == "__main__":
     try:
         workloads = load_workloads(WORKLOAD_PATH)
+        input_path = Path("evo/input.json")
+        output_path = Path("evo/output.json")
+        output_path.unlink(missing_ok=True)
+        input_path.write_text(json.dumps({
+            "workloads": [workload.tolist() for workload in workloads[:-1]],
+            "parameters": {"num_replicas": NUM_REPLICAS, "num_groups": NUM_GROUPS, "num_nodes": NUM_NODES, "num_gpus": NUM_GPUS},
+        }), encoding="utf-8")
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        candidate_outputs = json.loads(output_path.read_text(encoding="utf-8"))["outputs"]
+        if len(candidate_outputs) != len(workloads) - 1:
+            raise ValueError("Candidate returned the wrong number of rebalances")
 
         balancedness_scores_gpu = []
         balancedness_scores_expert = []
         times_algorithm = []
         times_inference = []
 
-        for i in range(len(workloads) - 1):
-            start_time = time.perf_counter()
-            phy2log, log2phy, logcnt = rebalance_experts(
-                workloads[i],
-                NUM_REPLICAS,
-                NUM_GROUPS,
-                NUM_NODES,
-                NUM_GPUS,
-            )
+        for i, candidate_output in enumerate(candidate_outputs):
+            phy2log = torch.tensor(candidate_output["phy2log"])
+            log2phy = torch.tensor(candidate_output["log2phy"])
+            logcnt = torch.tensor(candidate_output["logcnt"])
             end_time_algorithm = time.perf_counter()
 
             # Validate outputs to prevent reward hacking
@@ -145,8 +152,8 @@ if __name__ == "__main__":
             end_time = time.perf_counter()
             balancedness_scores_gpu.append(balancedness_score_gpu)
             balancedness_scores_expert.append(balancedness_score_expert)
-            times_algorithm.append(end_time_algorithm - start_time)
-            times_inference.append(end_time - start_time)
+            times_algorithm.append(float(candidate_output["runtime"]))
+            times_inference.append(float(candidate_output["runtime"]) + (end_time - end_time_algorithm))
 
         avg_balancedness_score_gpu = sum(balancedness_scores_gpu) / len(balancedness_scores_gpu)
         avg_balancedness_score_expert = sum(balancedness_scores_expert) / len(balancedness_scores_expert)

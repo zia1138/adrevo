@@ -6,7 +6,9 @@ import sys
 import time
 import traceback
 import concurrent.futures
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -128,13 +130,23 @@ if __name__ == "__main__":
         # imports execute module-level code in this process, so import main only
         # after test generation and dependency capture are complete.
         test_gpu_models = generate_test_gpu_models()
-        from main import compute_model_placement
+        input_path = Path("evo/input.json")
+        output_path = Path("evo/output.json")
+        output_path.unlink(missing_ok=True)
+        input_path.write_text(json.dumps({"requests": [
+            {"gpu_num": gpu_num, "models": [vars(model) for model in models]}
+            for gpu_num, models in test_gpu_models
+        ]}), encoding="utf-8")
+        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        candidate_placements = json.loads(output_path.read_text(encoding="utf-8"))["placements"]
+        if len(candidate_placements) != len(test_gpu_models):
+            raise ValueError("Candidate returned the wrong number of placements")
 
         all_kvpr = []
         all_metrics = []
         successful_runs = 0
 
-        for i, (gpu_num, gpu_models) in enumerate(test_gpu_models):
+        for i, ((gpu_num, gpu_models), candidate_placement) in enumerate(zip(test_gpu_models, candidate_placements)):
             try:
                 start_time = time.time()
                 model_snapshots = snapshot_models(gpu_models)
@@ -145,11 +157,10 @@ if __name__ == "__main__":
                     for model, snapshot in zip(gpu_models, model_snapshots)
                 }
 
-                placement = run_with_timeout(
-                    compute_model_placement,
-                    kwargs={'gpu_num': gpu_num, 'models': gpu_models},
-                    timeout_seconds=10
-                )
+                placement = {
+                    int(gpu_id): [gpu_models[index] for index in indices]
+                    for gpu_id, indices in candidate_placement.items()
+                }
 
                 execution_time = time.time() - start_time
 

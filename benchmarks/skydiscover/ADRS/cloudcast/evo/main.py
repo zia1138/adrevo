@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import networkx as nx
 from typing import Dict, List
 
@@ -76,3 +79,11 @@ def create_broadcast_topology(src: str, dsts: List[str], num_partitions: int = 4
 def run_search_algorithm(src: str, dsts: List[str], G, num_partitions: int):
     """Run the search algorithm and return the topology"""
     return search_algorithm(src, dsts, G, num_partitions)
+
+
+if __name__ == "__main__":
+    request = json.loads(Path("input.json").read_text(encoding="utf-8"))
+    graph = nx.DiGraph()
+    graph.add_edges_from((edge[0], edge[1], edge[2]) for edge in request["edges"])
+    topology = search_algorithm(request["source_node"], request["terminal_nodes"], graph, request["num_partitions"])
+    Path("output.json").write_text(json.dumps({"src": topology.src, "dsts": topology.dsts, "num_partitions": topology.num_partitions, "paths": topology.paths}), encoding="utf-8")

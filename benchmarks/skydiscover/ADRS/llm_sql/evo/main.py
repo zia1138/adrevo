@@ -1,3 +1,7 @@
+import json
+from pathlib import Path
+import time
+
 import pandas as pd
 from typing import Tuple, List, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -429,3 +433,17 @@ class Evolved(Algorithm):
 
         final_df = final_df.sort_values(by=final_df.columns.to_list(), axis=0)
         return final_df, []
+
+
+if __name__ == "__main__":
+    payload = json.loads(Path("input.json").read_text(encoding="utf-8"))
+    output_dir = Path("outputs")
+    output_dir.mkdir(exist_ok=True)
+    runtimes = []
+    for request in payload["requests"]:
+        dataframe = pd.read_csv(request["input_file"])
+        start = time.perf_counter()
+        reordered, _ = Evolved().reorder(dataframe, **request["options"])
+        runtimes.append(time.perf_counter() - start)
+        reordered.to_csv(output_dir / request["output_file"], index=False)
+    Path("output.json").write_text(json.dumps({"runtimes": runtimes}), encoding="utf-8")

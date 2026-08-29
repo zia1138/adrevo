@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 GPU_MEM_SIZE = 80  # GB
 
 
@@ -44,3 +47,14 @@ def compute_model_placement(gpu_num, models):
         shared_kv[best_idx] -= model.model_size
 
     return placement
+
+
+if __name__ == "__main__":
+    payload = json.loads(Path("input.json").read_text(encoding="utf-8"))
+    outputs = []
+    for request in payload["requests"]:
+        models = [type("Model", (), model)() for model in request["models"]]
+        indices = {id(model): index for index, model in enumerate(models)}
+        placement = compute_model_placement(request["gpu_num"], models)
+        outputs.append({str(gpu): [indices[id(model)] for model in assigned] for gpu, assigned in placement.items()})
+    Path("output.json").write_text(json.dumps({"placements": outputs}), encoding="utf-8")
