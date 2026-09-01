@@ -36,16 +36,14 @@ class ResumeStateTests(unittest.TestCase):
         try:
             initial = Program(
                 id="initial",
-                code="print('initial')",
-                language="python",
+                files={"evo/main.py": "print('initial')"},
                 model_id="initial",
                 correct=True,
                 combined_score=1.0,
             )
             child = Program(
                 id="child",
-                code="print('child')",
-                language="python",
+                files={"evo/main.py": "print('child')"},
                 model_id="test-model",
                 parent_id=initial.id,
                 generation=1,

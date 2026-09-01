@@ -62,7 +62,6 @@ def _should_preempt_work(
 
 def _run_preemptible_subprocess(
     cmd: List[str],
-    env: Dict[str, str],
     cwd: str,
     timeout_sec: int,
     stdout_path: Path,
@@ -80,7 +79,6 @@ def _run_preemptible_subprocess(
             stdout=stdout_file,
             stderr=stderr_file,
             text=True,
-            env=env,
             cwd=cwd,
             start_new_session=True,
         )
@@ -112,8 +110,7 @@ def _run_preemptible_subprocess(
 
 def _run_evaluator_task(
     parent_zip_bytes: bytes,
-    generated_code: str,
-    exec_fname_rel: str,
+    file_replacements: Dict[str, str],
     cmd: List[str],
     timeout_sec: int,
     data_zip_bytes: bytes | None = None,
@@ -138,22 +135,28 @@ def _run_evaluator_task(
             cache_dir = stage_data_to_node(data_zip_bytes)
             symlink_data_into_workdir(cache_dir, data_dirs, temp_dir)
 
-        # 2. Write the generated code to the specified relative path (if provided)
-        if generated_code and exec_fname_rel:
-            target_file = temp_path / exec_fname_rel
+        # 2. Apply the candidate file replacements.
+        if not isinstance(file_replacements, dict):
+            raise TypeError("file_replacements must be a dictionary")
+        for file_path, content in file_replacements.items():
+            relative_path = Path(file_path)
+            if (
+                not isinstance(file_path, str)
+                or not file_path
+                or relative_path.is_absolute()
+                or ".." in relative_path.parts
+                or not isinstance(content, str)
+            ):
+                raise ValueError("file_replacements must map safe relative paths to string contents")
+            target_file = temp_path / relative_path
             target_file.parent.mkdir(parents=True, exist_ok=True)
-            target_file.write_text(generated_code, encoding="utf-8")
+            target_file.write_text(content, encoding="utf-8")
 
-        # 3. Setup environment variables
-        env = os.environ.copy()
-        env.update(PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
-
-        # 4. Execute the command, polling for timeout or stale-parent preemption.
+        # 3. Execute the command, polling for timeout or stale-parent preemption.
         stdout_path = temp_path / "job_log.out"
         stderr_path = temp_path / "job_log.err"
         returncode, preempted, timed_out = _run_preemptible_subprocess(
             cmd=cmd,
-            env=env,
             cwd=temp_dir,
             timeout_sec=timeout_sec,
             stdout_path=stdout_path,
@@ -169,7 +172,7 @@ def _run_evaluator_task(
         if preempted:
             stderr_text += "\nEvaluation preempted because the claim became stale."
 
-        # 5. Save logs and returncode so they are included in the returned zip
+        # 4. Save logs and returncode so they are included in the returned zip
         (temp_path / "job_log.out").write_text(stdout_text, encoding="utf-8")
         (temp_path / "job_log.err").write_text(stderr_text, encoding="utf-8")
         (temp_path / "returncode.json").write_text(
@@ -183,58 +186,8 @@ def _run_evaluator_task(
             encoding="utf-8",
         )
 
-        # 6. Zip the entire temp directory and return (excluding data dirs)
+        # 5. Zip the entire temp directory and return (excluding data dirs)
         return zip_dir_to_bytes(temp_dir, exclude_dirs=data_dirs)
-
-def _run_command_task(
-    parent_zip_bytes: bytes,
-    cmd: List[str],
-    timeout_sec: int = 60,
-    data_zip_bytes: bytes | None = None,
-    data_dirs: tuple = (),
-    preempt_db: Any | None = None,
-    preempt_claim_id: str | None = None,
-) -> Dict[str, Any]:
-    """
-    Extracts parent_zip_bytes to a temp directory, runs a command, and returns
-    a dict with returncode, stdout, and stderr.
-    """
-    with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
-        extract_parent_bytes_to_dir(parent_zip_bytes, temp_dir)
-
-        if data_zip_bytes is not None and data_dirs:
-            cache_dir = stage_data_to_node(data_zip_bytes)
-            symlink_data_into_workdir(cache_dir, data_dirs, temp_dir)
-
-        env = os.environ.copy()
-        env.update(PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
-
-        stdout_path = Path(temp_dir) / "job_log.out"
-        stderr_path = Path(temp_dir) / "job_log.err"
-        returncode, preempted, timed_out = _run_preemptible_subprocess(
-            cmd=cmd,
-            env=env,
-            cwd=temp_dir,
-            timeout_sec=timeout_sec,
-            stdout_path=stdout_path,
-            stderr_path=stderr_path,
-            preempt_db=preempt_db,
-            preempt_claim_id=preempt_claim_id,
-        )
-
-        stdout_text = stdout_path.read_text(encoding="utf-8") if stdout_path.exists() else ""
-        stderr_text = stderr_path.read_text(encoding="utf-8") if stderr_path.exists() else ""
-        if timed_out:
-            stderr_text += f"\nCommand timed out after {timeout_sec} seconds."
-        if preempted:
-            stderr_text += "\nCommand preempted because the claim became stale."
-        return {
-            "returncode": returncode,
-            "stdout": stdout_text,
-            "stderr": stderr_text,
-            "preempted": preempted,
-            "timed_out": timed_out,
-        }
 
 class RayExecutionBackend(ExecutionBackend):
     """
@@ -267,8 +220,7 @@ class RayExecutionBackend(ExecutionBackend):
     def run_job(
         self,
         parent_zip_bytes: bytes,
-        generated_code: str,
-        exec_fname_rel: str,
+        file_replacements: Dict[str, str],
         preempt_db: Any | None = None,
         preempt_claim_id: str | None = None,
     ) -> Tuple[Dict[str, Any], float, bytes]:
@@ -278,12 +230,11 @@ class RayExecutionBackend(ExecutionBackend):
         t0 = time.time()
 
         if self.verbose:
-            logger.info(f"Running job for {exec_fname_rel}...")
+            logger.info("Running job with replacements for %s", ", ".join(file_replacements))
 
         result_zip_bytes: bytes = _run_evaluator_task(
             parent_zip_bytes=parent_zip_bytes,
-            generated_code=generated_code,
-            exec_fname_rel=exec_fname_rel,
+            file_replacements=file_replacements,
             cmd=cmd,
             timeout_sec=self.config.timeout_sec,
             data_zip_bytes=self.data_handle,
@@ -305,41 +256,3 @@ class RayExecutionBackend(ExecutionBackend):
             results["stderr_log"] += f"\nProcess failed with return code {returncode}."
 
         return results, rtime, result_zip_bytes
-
-    def run_command(
-        self,
-        parent_zip_bytes: bytes,
-        cmd: List[str],
-        preempt_db: Any | None = None,
-        preempt_claim_id: str | None = None,
-    ) -> Dict[str, Any]:
-        return _run_command_task(
-            parent_zip_bytes=parent_zip_bytes,
-            cmd=cmd,
-            timeout_sec=self.config.timeout_sec,
-            data_zip_bytes=self.data_handle,
-            data_dirs=self.data_dirs,
-            preempt_db=preempt_db,
-            preempt_claim_id=preempt_claim_id,
-        )
-
-    def run_command_with_zip(
-        self,
-        parent_zip_bytes: bytes,
-        cmd: List[str],
-        preempt_db: Any | None = None,
-        preempt_claim_id: str | None = None,
-    ) -> Tuple[Dict[str, Any], bytes]:
-        result_zip_bytes: bytes = _run_evaluator_task(
-            parent_zip_bytes=parent_zip_bytes,
-            generated_code="",
-            exec_fname_rel="",
-            cmd=cmd,
-            timeout_sec=self.config.timeout_sec,
-            data_zip_bytes=self.data_handle,
-            data_dirs=self.data_dirs,
-            preempt_db=preempt_db,
-            preempt_claim_id=preempt_claim_id,
-        )
-        results = parse_results_from_zip(result_zip_bytes)
-        return results, result_zip_bytes

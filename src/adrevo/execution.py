@@ -144,39 +144,12 @@ class ExecutionBackend(ABC):
     def run_job(
         self,
         parent_zip_bytes: bytes,
-        generated_code: str,
-        exec_fname_rel: str,
+        file_replacements: Dict[str, str],
         preempt_db: Any | None = None,
-        preempt_score: float | None = None,
+        preempt_claim_id: str | None = None,
     ) -> Tuple[Dict[str, Any], float, bytes]:
         """
-        Executes the generated code and returns a tuple of (results_dict, runtime_seconds, zip bytes from execution results).
-        """
-        pass
-
-    @abstractmethod
-    def run_command(
-        self,
-        parent_zip_bytes: bytes,
-        cmd: List[str],
-        preempt_db: Any | None = None,
-        preempt_score: float | None = None,
-    ) -> Dict[str, Any]:
-        """
-        Runs a command in the parent zip environment and returns a dict with returncode, stdout, and stderr.
-        """
-        pass
-
-    @abstractmethod
-    def run_command_with_zip(
-        self,
-        parent_zip_bytes: bytes,
-        cmd: List[str],
-        preempt_db: Any | None = None,
-        preempt_score: float | None = None,
-    ) -> Tuple[Dict[str, Any], bytes]:
-        """
-        Runs a command that may modify files in the parent zip environment.
-        Returns (results_dict with returncode/stdout/stderr, updated_zip_bytes).
+        Applies candidate file replacements, executes the trusted evaluator, and
+        returns ``(results_dict, runtime_seconds, result_zip_bytes)``.
         """
         pass

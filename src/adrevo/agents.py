@@ -840,8 +840,9 @@ class AdrevoWorker:
         """
         results, runtime_sec, result_zip_bytes = self.backend.run_job(
             parent_zip_bytes=context.current_zip_bytes,
-            generated_code=program,
-            exec_fname_rel=self.evo_config.evo_file,
+            file_replacements={
+                self.evo_config.evolvable_files[0].file: program,
+            },
             preempt_db=self.db,
             preempt_claim_id=context.claim_id,
         )
@@ -862,10 +863,11 @@ class AdrevoWorker:
                 fdback.append(f"It achieved a score of {combined}.")
                 db_program = Program(
                     id=str(uuid.uuid4()),
-                    code=program,
+                    files={
+                        self.evo_config.evolvable_files[0].file: program,
+                    },
                     parent_id=context.parent.id,
                     generation=context.current_gen,
-                    language=self.evo_config.lang_identifier,
                     model_id=session.selected_model.model_id,
                     correct=True,
                     combined_score=combined,
@@ -916,8 +918,9 @@ class AdrevoWorker:
     ) -> str:
         results, _, _ = self.backend.run_job(
             parent_zip_bytes=context.current_zip_bytes,
-            generated_code=program,
-            exec_fname_rel=self.evo_config.evo_file,
+            file_replacements={
+                self.evo_config.evolvable_files[0].file: program,
+            },
             preempt_db=self.db,
             preempt_claim_id=context.claim_id,
         )

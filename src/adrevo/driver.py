@@ -22,14 +22,14 @@ class AdrevoDriver:
         self,
         evo_config: AdrevoConfig,
         backend_config: BackendConfig,
-        project_dir: str,
+        project_dir: str | Path,
         results_dir: Path,
         verbose: bool = False,
         resume_from: Path | None = None,
     ):
         self.evo_config = evo_config
         self.backend_config = backend_config
-        self.project_dir = project_dir
+        self.project_dir = Path(project_dir)
         self.results_dir = Path(results_dir)
         self.verbose = verbose
         self.start_gen = 0
@@ -83,7 +83,7 @@ class AdrevoDriver:
 
         # Stage data files via the backend's transport mechanism.
         if backend_config.data_dirs:
-            data_zip_bytes = zip_data_dirs_to_bytes(project_dir, backend_config.data_dirs)
+            data_zip_bytes = zip_data_dirs_to_bytes(self.project_dir, backend_config.data_dirs)
             self.data_handle = self.backend.stage_data(data_zip_bytes)
             if self.verbose:
                 logger.info(
@@ -247,14 +247,15 @@ class AdrevoDriver:
     def _run_generation_0(self):
         """Setup and run generation 0 to initialize the database."""
         if self.verbose:
-            logger.info(
-                f"Reading initial program from {self.project_dir}/{self.evo_config.evo_file}"
-            )
-        
+            logger.info("Reading initial evolvable files from %s", self.project_dir)
+
         try:
-            initial_code = Path(f"{self.project_dir}/{self.evo_config.evo_file}").read_text(encoding="utf-8")
+            initial_files = {
+                spec.file: (self.project_dir / spec.file).read_text(encoding="utf-8")
+                for spec in self.evo_config.evolvable_files
+            }
         except Exception as e:
-            raise ValueError(f"Could not read initial program from {self.project_dir}/{self.evo_config.evo_file}. Error: {e}")
+            raise ValueError(f"Could not read initial evolvable files: {e}")
 
         # Zip the project directory to use as parent_zip_bytes for generation 0
         # Data dirs are excluded here; they are staged separately via the object store.
@@ -263,21 +264,19 @@ class AdrevoDriver:
         # Run the evaluation code using the Ray backend.
         results, rtime, result_zip_bytes = self.backend.run_job(
             parent_zip_bytes=parent_zip_bytes,
-            generated_code=initial_code,
-            exec_fname_rel=self.evo_config.evo_file
+            file_replacements={},
         )
 
         if results.get('correct'):
             combined :float = results.get("combined_score")
             db_program = Program(
                 id=str(uuid.uuid4()),
-                code=initial_code,
+                files=initial_files,
                 parent_id=None,
                 model_id="initial",
                 generation=0,
                 correct=True,
                 combined_score=combined,
-                language=self.evo_config.lang_identifier,
                 compute_time=rtime,
             )
 

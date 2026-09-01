@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import math
 from pathlib import Path
-from typing import Callable, Dict, Any
+from typing import Any, Callable
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 
@@ -28,6 +28,21 @@ class ModelSpec:
     max_concurrent_leases: int = 1000
     max_model_turns: int = 8
 
+
+@dataclass(frozen=True)
+class EvolvableFile:
+    """A candidate-owned file that Adrevo may replace.
+
+    Attributes:
+        file: Project-relative path to the file.
+        lang_identifier: Markdown code-fence language used when prompting for
+            this file, such as ```python```, ```toml```, or ```go```.
+    """
+
+    file: str
+    lang_identifier: str
+
+
 @dataclass(frozen=True)
 class AdrevoConfig:
     """
@@ -38,8 +53,8 @@ class AdrevoConfig:
         task_sys_msg: Optional system message for the task.
         num_agent_workers: Number of agent workers to use.
         max_generations: Maximum number of program generations to evolve.
-        lang_identifier: Language used for any LLM code blocks (e.g. ```python ... ```).
-        evo_file: Name of the file to use for rewriting for optimization/improvement/discovery. Default is evo/main.py.
+        evolvable_files: Candidate-owned files Adrevo may edit. Each file has
+            its own language identifier for LLM code blocks.
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
         use_probe: Whether to run diagnostic probing during the multi-turn loop.
         dl_evostate_freq: Frequency (in seconds) to download evo state from workers and database.
@@ -55,8 +70,9 @@ class AdrevoConfig:
     task_sys_msg: str =  ""
     num_agent_workers: int = 4
     max_generations: int = 500
-    lang_identifier: str = "python"  # TODO: Add support for more languages.
-    evo_file: str = "evo/main.py"
+    evolvable_files: tuple[EvolvableFile, ...] = (
+        EvolvableFile(file="evo/main.py", lang_identifier="python"),
+    )
     evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
     use_probe: bool = True
     dl_evostate_freq: float = 30
@@ -67,6 +83,21 @@ class AdrevoConfig:
     pr_strategies: tuple = ()
     max_cost: float = float('inf')  # limit token cost in evolution
     backtrack_steps: int = 1
+
+    @property
+    def evo_file(self) -> str:
+        """Legacy singular-file view of the first evolvable file.
+
+        New code should use :attr:`evolvable_files`; this property keeps older
+        single-file workers and integrations working while configurations may
+        declare more than one evolvable file.
+        """
+        return self.evolvable_files[0].file
+
+    @property
+    def lang_identifier(self) -> str:
+        """Legacy language identifier paired with :attr:`evo_file`."""
+        return self.evolvable_files[0].lang_identifier
 
 def validate_adrevo(cfg: AdrevoConfig) -> None:
     """Validate the AdrevoConfig object."""
@@ -85,9 +116,24 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
         raise ValueError("AdrevoConfig.backtrack_steps must be an integer >= 1")
     if not isinstance(cfg.use_probe, bool):
         raise ValueError("AdrevoConfig.use_probe must be a boolean")
-    if not isinstance(cfg.lang_identifier, str) or not cfg.lang_identifier.strip():
-        raise ValueError("AdrevoConfig.lang_identifier must be a non-empty string")
-    _validate_relative_path(cfg.evo_file, "AdrevoConfig.evo_file")
+    if not isinstance(cfg.evolvable_files, tuple) or not cfg.evolvable_files:
+        raise ValueError("AdrevoConfig.evolvable_files must be a non-empty tuple")
+    seen_evolvable_files: set[str] = set()
+    for index, evolvable_file in enumerate(cfg.evolvable_files):
+        field_name = f"AdrevoConfig.evolvable_files[{index}]"
+        if not isinstance(evolvable_file, EvolvableFile):
+            raise ValueError(f"{field_name} must be an EvolvableFile")
+        _validate_relative_path(evolvable_file.file, f"{field_name}.file")
+        if Path(evolvable_file.file).parts[0] != "evo":
+            raise ValueError(f"{field_name}.file must be inside evo/: {evolvable_file.file}")
+        if (
+            not isinstance(evolvable_file.lang_identifier, str)
+            or not evolvable_file.lang_identifier.strip()
+        ):
+            raise ValueError(f"{field_name}.lang_identifier must be a non-empty string")
+        if evolvable_file.file in seen_evolvable_files:
+            raise ValueError(f"Duplicate evolvable file: {evolvable_file.file}")
+        seen_evolvable_files.add(evolvable_file.file)
     _validate_relative_path(cfg.evaluate_file, "AdrevoConfig.evaluate_file")
     if not isinstance(cfg.dl_evostate_freq, (int, float)) or cfg.dl_evostate_freq <= 0:
         raise ValueError("AdrevoConfig.dl_evostate_freq must be a positive number")

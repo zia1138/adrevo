@@ -197,9 +197,12 @@ def _validate_initial_project_inputs(
     backend_cfg: BackendConfig,
 ) -> None:
     """Validate files and directories needed before a Ray session starts."""
-    evo_path = project_dir / adrevo_cfg.evo_file
-    if not evo_path.is_file():
-        raise typer.BadParameter(f"Initial evolution file not found: {evo_path}")
+    for evolvable_file in adrevo_cfg.evolvable_files:
+        file_path = project_dir / evolvable_file.file
+        if not file_path.is_file():
+            raise typer.BadParameter(
+                f"Initial evolvable file not found: {file_path}"
+            )
 
     evaluate_path = project_dir / adrevo_cfg.evaluate_file
     if not evaluate_path.is_file():

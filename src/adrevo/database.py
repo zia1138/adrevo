@@ -47,8 +47,9 @@ class Program:
 
     # Program identification
     id: str
-    code: str
-    language: str 
+    # Complete contents of the candidate-owned files. The corresponding zip is
+    # the executable project state; this mapping supports prompt/audit views.
+    files: Dict[str, str]
     model_id: str
     timestamp: float = field(default_factory=time.time) 
 
@@ -63,6 +64,17 @@ class Program:
     correct: bool = False
     children_count: int = 0
     children_ids: List[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.files:
+            raise ValueError("Program.files must contain at least one file")
+        if any(
+            not isinstance(path, str)
+            or not path
+            or not isinstance(content, str)
+            for path, content in self.files.items()
+        ):
+            raise ValueError("Program.files must map non-empty paths to string contents")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dict representation, cleaning NaN values for JSON."""
@@ -122,7 +134,7 @@ class ProgramDatabase:
         # ------------------------------------------------------------------
         # Checkpointed database state (returned by get_database_state()).
         # ------------------------------------------------------------------
-        # Program records contain code, scores, lineage, and timing metadata.
+        # Program records contain file contents, scores, lineage, and timing metadata.
         # children_count/children_ids are caches rebuilt from parent_id on load.
         self.programs: Dict[str, Program] = {}
 
