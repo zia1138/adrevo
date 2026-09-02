@@ -228,3 +228,73 @@ def extract_last_code_fence_for_language(text: str, language: str) -> str:
 
     return last_block
 
+
+def extract_file_replacements(
+    text: str,
+    expected_languages: dict[str, str],
+) -> dict[str, str]:
+    """Extract complete file replacements from a structured LLM response.
+
+    Each replacement must use the following format, where ``path`` is an
+    allowed file path and the fence info string exactly matches the language
+    configured for that path::
+
+        ### path/to/file
+        ```language
+        complete replacement contents
+        ```
+
+    Text outside replacement sections is ignored.  A response must contain at
+    least one replacement, and each path may appear at most once.
+    """
+    if not text:
+        raise ValueError("No text provided.")
+    if not expected_languages:
+        raise ValueError("No evolvable files are configured.")
+
+    replacements: dict[str, str] = {}
+    lines = text.splitlines(keepends=True)
+    index = 0
+
+    while index < len(lines):
+        header_match = re.match(r"^[ \t]*###\s+(?P<path>\S(?:.*\S)?)[ \t]*$", lines[index].rstrip("\r\n"))
+        if header_match is None:
+            index += 1
+            continue
+
+        file_path = header_match.group("path")
+        if file_path not in expected_languages:
+            raise ValueError(f"Unexpected file replacement path: {file_path}")
+        if file_path in replacements:
+            raise ValueError(f"Duplicate file replacement path: {file_path}")
+
+        index += 1
+        if index >= len(lines):
+            raise ValueError(f"Missing code fence for replacement: {file_path}")
+        opening_fence = _CODE_FENCE_LINE_RE.match(lines[index].rstrip("\r\n"))
+        if opening_fence is None:
+            raise ValueError(f"Missing code fence for replacement: {file_path}")
+
+        language = opening_fence.group("info").strip()
+        expected_language = expected_languages[file_path]
+        if language != expected_language:
+            raise ValueError(
+                f"Replacement for {file_path} must use ```{expected_language}``` "
+                f"but used ```{language}```."
+            )
+
+        index += 1
+        contents: list[str] = []
+        while index < len(lines):
+            if _CODE_FENCE_CLOSE_RE.match(lines[index].rstrip("\r\n")):
+                replacements[file_path] = "".join(contents)
+                index += 1
+                break
+            contents.append(lines[index])
+            index += 1
+        else:
+            raise ValueError(f"Unclosed code fence for replacement: {file_path}")
+
+    if not replacements:
+        raise ValueError("No structured file replacements found.")
+    return replacements

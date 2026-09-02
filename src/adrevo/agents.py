@@ -19,7 +19,7 @@ from adrevo.database import Program, ProgramDatabase
 from adrevo.ray_backend import RayExecutionBackend
 from adrevo.utils import (
     extract_file_to_string,
-    extract_last_code_fence_for_language,
+    extract_file_replacements,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,8 +107,8 @@ class ModelSession:
     message_history: Any = None
     # Counts failed code-update evaluations since the last diagnostic detour.
     consecutive_code_update_failures: int = 0
-    # Raw source extracted from the response that just came back.
-    turn_payload: str | None = None
+    # Complete replacements extracted from the response that just came back.
+    turn_payload: dict[str, str] | None = None
     # Evaluation feedback from the accepted code update, kept so an optional
     # final summary turn can ask the same LLM what strategy worked.
     success_feedback_prompt: str = ""
@@ -829,20 +829,20 @@ class AdrevoWorker:
     def _evaluate_code_update(
         self,
         context: ParentRunContext,
-        program: str,
+        file_replacements: dict[str, str],
         session: ModelSession,
     ) -> tuple[bool, str]:
-        """Evaluate generated code and return ``(improved, feedback_prompt)``.
+        """Evaluate generated replacements and return ``(improved, feedback_prompt)``.
 
-        ``improved`` is true only when the code update beats the claimed parent.
+        ``improved`` is true only when the replacement set beats the claimed parent.
         ``feedback_prompt`` summarizes the evaluation result without deciding
         what the next LLM turn should produce.
         """
+        candidate_files = dict(context.parent.files)
+        candidate_files.update(file_replacements)
         results, runtime_sec, result_zip_bytes = self.backend.run_job(
             parent_zip_bytes=context.current_zip_bytes,
-            file_replacements={
-                self.evo_config.evolvable_files[0].file: program,
-            },
+            file_replacements=file_replacements,
             preempt_db=self.db,
             preempt_claim_id=context.claim_id,
         )
@@ -863,9 +863,7 @@ class AdrevoWorker:
                 fdback.append(f"It achieved a score of {combined}.")
                 db_program = Program(
                     id=str(uuid.uuid4()),
-                    files={
-                        self.evo_config.evolvable_files[0].file: program,
-                    },
+                    files=candidate_files,
                     parent_id=context.parent.id,
                     generation=context.current_gen,
                     model_id=session.selected_model.model_id,
@@ -914,13 +912,11 @@ class AdrevoWorker:
     def _run_diagnostic(
         self,
         context: ParentRunContext,
-        program: str,
+        file_replacements: dict[str, str],
     ) -> str:
         results, _, _ = self.backend.run_job(
             parent_zip_bytes=context.current_zip_bytes,
-            file_replacements={
-                self.evo_config.evolvable_files[0].file: program,
-            },
+            file_replacements=file_replacements,
             preempt_db=self.db,
             preempt_claim_id=context.claim_id,
         )
@@ -936,10 +932,9 @@ class AdrevoWorker:
             context,
             textwrap.dedent("""
                 {diagnostic_output}
-                Learn from the diagnostic output above and write a complete replacement for `{evo_file}` that improves on the parent score of {parent_score}.
+                Learn from the diagnostic output above and write complete replacements for any candidate files that need to change to improve on the parent score of {parent_score}.
             """).format(
                 diagnostic_output=diagnostic_output,
-                evo_file=self.evo_config.evo_file,
                 parent_score=context.parent_score,
             ).strip(),
             include_strategy=False,
@@ -1036,30 +1031,41 @@ class AdrevoWorker:
         context: ParentRunContext,
         max_model_turns: int,
     ) -> str:
+        parent_files = "\n\n".join(
+            textwrap.dedent("""\
+                ### {file}
+                ```{lang_identifier}
+                {contents}
+                ```
+            """).format(
+                file=spec.file,
+                lang_identifier=spec.lang_identifier,
+                contents=context.parent.files[spec.file],
+            ).rstrip()
+            for spec in self.evo_config.evolvable_files
+        )
         prompt = textwrap.dedent("""
-            Write a complete replacement for `{evo_file}` that achieves a higher `combined_score` than the parent program.
+            Improve one or more source code files to achieve a higher `combined_score` than the parent program.
             The parent program score is {score}.
-            Improve the current algorithm or replace it with a new one.
+            Improve the current algorithm, replace it with a new algorithm, or install and use new dependencies.
 
-            The parent program is the current contents of `{evo_file}`:
-            ```{lang_identifier}
-            {code}
-            ```
+            The current candidate files are:
 
-            `{evaluate_file}` evaluates `{evo_file}` and computes `combined_score`:
-            ```{lang_identifier}
+            {parent_files}
+
+            `{evaluate_file}` builds and evaluates the candidate and computes `combined_score`
+
+            ### {evaluate_file}
+            ```python
             {eval_code}
             ```
 
             Preserve the existing input, output, and entrypoint behavior.
-            Use only dependencies already declared by the candidate project.
             You have at most {max_model_turns} model turns total, including this one.
             Learn from feedback and revise accordingly.
         """).format(
             score=context.parent.combined_score,
-            evo_file=self.evo_config.evo_file,
-            lang_identifier=self.evo_config.lang_identifier,
-            code=context.parent.code,
+            parent_files=parent_files,
             max_model_turns=max_model_turns,
             evaluate_file=self.evo_config.evaluate_file,
             eval_code=context.eval_code,
@@ -1078,34 +1084,53 @@ class AdrevoWorker:
         if include_revision_instruction:
             prompt += textwrap.dedent("""
 
-                Learn from the feedback above and write a complete replacement for `{evo_file}`.
-            """).format(evo_file=self.evo_config.evo_file).rstrip()
+                Learn from the feedback above and write complete replacements for any candidate files that need to change.
+            """).rstrip()
 
         if include_strategy and context.strategy:
             prompt += textwrap.dedent("""
                 {strategy}
             """).format(strategy=context.strategy).rstrip()
 
-        response_instruction = textwrap.dedent("""
-            Return the complete replacement contents of `{evo_file}` inside one ```{lang_identifier}``` code fence.
-        """).format(
-            evo_file=self.evo_config.evo_file,
-            lang_identifier=self.evo_config.lang_identifier,
-        ).strip()
+        response_instruction = self._format_file_replacement_contract()
 
         return prompt + "\n\n" + response_instruction
+
+    def _format_file_replacement_contract(self) -> str:
+        allowed_files = "\n".join(
+            f"- `{spec.file}` with a ```{spec.lang_identifier}``` code fence"
+            for spec in self.evo_config.evolvable_files
+        )
+        return textwrap.dedent("""
+            Return one or more complete file replacements and nothing else using this exact format:
+
+            ### path/to/file
+            ```language-identifier
+            complete replacement contents
+            ```
+
+            The `###` heading must be immediately followed by its code fence. Each path may appear only once. Omit files that should remain unchanged.
+
+            Allowed path and language pairs:
+            {allowed_files}
+        """).format(allowed_files=allowed_files).strip()
 
     def _format_diagnostic_prompt(
         self,
         context: ParentRunContext,
         feedback_prompt: str | None = None,
     ) -> str:
+        candidate_files = ", ".join(
+            f"`{spec.file}`" for spec in self.evo_config.evolvable_files
+        )
         prompt = textwrap.dedent("""
             The last code update did not beat the parent score of **{score}**.
-            Write an instrumented diagnostic version of `{evo_file}` to learn why.
+            Write instrumented diagnostic replacements for one or more candidate files to learn why.
+
+            Candidate files: {candidate_files}
 
             Requirements:
-            1. Preserve the same entrypoint so `{evaluate_file}` can still run it.
+            1. Preserve the input, output, and entrypoint behavior required by `{evaluate_file}`.
             2. Add lightweight instrumentation that prints targeted, actionable evidence.
             3. Go beyond trivial shape or head printing when the program uses structured data.
             4. Prefer observations that can motivate a concrete next code change.
@@ -1113,19 +1138,12 @@ class AdrevoWorker:
             6. Keep the diagnostic run brief and low cost.
         """).format(
             score=context.parent_score,
-            evo_file=self.evo_config.evo_file,
+            candidate_files=candidate_files,
             evaluate_file=self.evo_config.evaluate_file,
         ).strip()
         if feedback_prompt:
             prompt = feedback_prompt.rstrip() + "\n\n" + prompt
-        response_instruction = textwrap.dedent("""
-            Return the complete diagnostic `{evo_file}` inside one ```{lang_identifier}``` code fence.
-        """).format(
-            evo_file=self.evo_config.evo_file,
-            lang_identifier=self.evo_config.lang_identifier,
-        ).strip()
-
-        return prompt + "\n\n" + response_instruction
+        return prompt + "\n\n" + self._format_file_replacement_contract()
 
     def _format_success_summary_prompt(self, session: ModelSession) -> str:
         return textwrap.dedent("""
@@ -1155,10 +1173,13 @@ class AdrevoWorker:
             feedback_prompt=session.last_evaluation_feedback or "No program evaluation feedback is available.",
         ).strip()
 
-    def _extract_turn_payload(self, response_text: str) -> str:
-        return extract_last_code_fence_for_language(
+    def _extract_turn_payload(self, response_text: str) -> dict[str, str]:
+        return extract_file_replacements(
             response_text,
-            self.evo_config.lang_identifier,
+            {
+                spec.file: spec.lang_identifier
+                for spec in self.evo_config.evolvable_files
+            },
         )
 
     def _format_missing_fence_prompt(
@@ -1168,30 +1189,27 @@ class AdrevoWorker:
         exc: ValueError,
     ) -> str:
         response_kind = session.scheduled_turn.expected_response
-        fence_requirement = f"a ```{self.evo_config.lang_identifier}``` code fence"
         response_label = {
             ModelResponseKind.CODE_UPDATE: "code update",
             ModelResponseKind.DIAGNOSE: "diagnostic code",
         }[response_kind]
         prompt = textwrap.dedent("""
-            Your previous response did not include {fence_requirement} for the {response_label} response.
-            Error: {error}
+            Your previous {response_label} response could not be parsed.
+
+            Parser error: {error}
+
+            {replacement_contract}
         """).format(
-            fence_requirement=fence_requirement,
             response_label=response_label,
             error=exc,
+            replacement_contract=self._format_file_replacement_contract(),
         ).strip()
-        if response_kind == ModelResponseKind.CODE_UPDATE:
-            return self._format_code_update_prompt(
-                context,
-                prompt,
-            )
-        if response_kind == ModelResponseKind.DIAGNOSE:
-            return self._format_diagnostic_prompt(
-                context,
-                prompt,
-            )
-        raise RuntimeError(f"Unexpected response kind: {response_kind}")
+        if response_kind not in {
+            ModelResponseKind.CODE_UPDATE,
+            ModelResponseKind.DIAGNOSE,
+        }:
+            raise RuntimeError(f"Unexpected response kind: {response_kind}")
+        return prompt
 
     def _append_captured_output(
         self,
