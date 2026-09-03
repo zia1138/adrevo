@@ -124,7 +124,7 @@ if __name__ == "__main__":
             }),
             encoding="utf-8",
         )
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         candidate_outputs = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["filtered_signals"]
         if len(candidate_outputs) != len(test_signals):
             raise ValueError("Candidate returned the wrong number of filtered signals")

@@ -13,7 +13,7 @@ OUTPUT_FILE = Path("evo/minimizing_max_min_dist_3.json")
 if __name__ == "__main__":
     try:
         OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         points = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["points"]
     except Exception as exc:
         Path("results.json").write_text(json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4), encoding="utf-8")

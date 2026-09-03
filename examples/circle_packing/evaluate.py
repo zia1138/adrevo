@@ -50,7 +50,7 @@ if __name__ == "__main__":
     try:
         OUTPUT_FILE.unlink(missing_ok=True)
         subprocess.run(
-            ["uv", "run", "--directory", "evo", "python", "main.py"],
+            ["uv", "run", "-qq", "--directory", "evo", "python", "main.py"],
             check=True,
         )
 

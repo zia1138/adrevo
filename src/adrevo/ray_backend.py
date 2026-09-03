@@ -215,7 +215,7 @@ class RayExecutionBackend(ExecutionBackend):
     def _build_command(self) -> List[str]:
         # The evaluator runs from the extracted project directory. Select it
         # explicitly instead of relying on an inherited active environment.
-        return ["uv", "-q", "run", "--project", ".", "python", self.evaluator_file]
+        return ["uv", "-qq", "run", "--project", ".", "python", self.evaluator_file]
 
     def run_job(
         self,

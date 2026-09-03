@@ -115,7 +115,7 @@ if __name__ == "__main__":
             for filename, col_merge in zip(test_files, col_merges)
             if os.path.exists(filename)
         ]}), encoding="utf-8")
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         candidate_runtimes = json.loads(output_path.read_text(encoding="utf-8"))["runtimes"]
 
         failed_files = 0

@@ -118,7 +118,7 @@ def run_with_timeout(timeout_seconds=600):
     with open(input_path, "w") as f:
         json.dump({"workloads": [WORKLOAD_1, WORKLOAD_2, WORKLOAD_3]}, f)
     subprocess.run(
-        ["uv", "run", "--directory", "evo", "python", "main.py"],
+        ["uv", "run", "-qq", "--directory", "evo", "python", "main.py"],
         check=True,
         timeout=timeout_seconds,
     )

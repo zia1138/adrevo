@@ -117,7 +117,7 @@ def evaluate_candidate(candidate):
 if __name__ == "__main__":
     try:
         OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
         is_valid, error_msg, combined_score = evaluate_candidate(payload["circles"])
     except Exception as exc:

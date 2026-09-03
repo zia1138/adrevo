@@ -137,7 +137,7 @@ if __name__ == "__main__":
             {"gpu_num": gpu_num, "models": [vars(model) for model in models]}
             for gpu_num, models in test_gpu_models
         ]}), encoding="utf-8")
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         candidate_placements = json.loads(output_path.read_text(encoding="utf-8"))["placements"]
         if len(candidate_placements) != len(test_gpu_models):
             raise ValueError("Candidate returned the wrong number of placements")

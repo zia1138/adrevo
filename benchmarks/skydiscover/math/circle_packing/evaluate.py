@@ -48,7 +48,7 @@ def validate_packing(centers, radii, atol=1e-10):
 if __name__ == "__main__":
     try:
         OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
         is_valid, error_msg = validate_packing(payload["centers"], payload["radii"])
         result = {"correct": is_valid, "error": error_msg,

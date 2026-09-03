@@ -101,7 +101,7 @@ if __name__ == "__main__":
             "workloads": [workload.tolist() for workload in workloads[:-1]],
             "parameters": {"num_replicas": NUM_REPLICAS, "num_groups": NUM_GROUPS, "num_nodes": NUM_NODES, "num_gpus": NUM_GPUS},
         }), encoding="utf-8")
-        subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
         candidate_outputs = json.loads(output_path.read_text(encoding="utf-8"))["outputs"]
         if len(candidate_outputs) != len(workloads) - 1:
             raise ValueError("Candidate returned the wrong number of rebalances")

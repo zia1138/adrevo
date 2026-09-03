@@ -339,7 +339,7 @@ if __name__ == "__main__":
                     "num_partitions": num_partitions,
                     "edges": [[src, dst, dict(data)] for src, dst, data in reference_graph.edges(data=True)],
                 }), encoding="utf-8")
-                subprocess.run(["uv", "run", "--directory", "evo", "python", "main.py"], check=True)
+                subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
                 candidate_output = json.loads(output_path.read_text(encoding="utf-8"))
                 bc_t = SimpleNamespace(**candidate_output)
 
