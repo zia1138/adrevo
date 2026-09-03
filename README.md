@@ -27,8 +27,8 @@ uv run adrevo run examples/circle_packing --config config_cerebras.py --verbose
 
 Adrevo evolves candidate code; it does not decide whether that code is correct. You provide the trusted evaluator that does.
 
-1. You provide a project with trusted `evaluate.py`, an initial candidate at `evo/main.py`, and a configuration.
-2. Adrevo asks models for replacements of `evo/main.py`. It never edits `evaluate.py`.
+1. You provide a project with trusted `evaluate.py`, candidate files under `evo/`, and a configuration.
+2. Adrevo asks models for replacements of the configured candidate files. It never edits `evaluate.py`.
 3. For each replacement, Adrevo runs `evaluate.py`. The evaluator builds and runs the candidate, validates its output, and writes `results.json`.
 4. Adrevo reads `results.json` and keeps candidates with a better `combined_score`.
 
@@ -48,7 +48,7 @@ Manage dependencies for evolved code in `evo/` yourself—for example, in `evo/p
 
 Each evaluation follows this contract:
 
-1. Adrevo copies the project, replaces the configured `evo_file`, and runs `evaluate.py` in the `uv` environment you specified for the trusted evaluator.
+1. Adrevo copies the project, replaces the candidate files returned by the model, and runs `evaluate.py` in the `uv` environment you specified for the trusted evaluator.
 2. Trusted `evaluate.py` builds and runs the candidate, then validates its output file.
 3. The evaluator writes `results.json`; Adrevo reads it to decide whether the candidate improved.
 
@@ -72,7 +72,20 @@ my-project/
     └── pyproject.toml # candidate dependencies, if it uses uv
 ```
 
-`config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there, and define `build_evo_models()` for the models Adrevo uses to evolve `evo/main.py`.
+`config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there, and define `build_evo_models()` for the models Adrevo uses to evolve the candidate.
+
+### Multiple evolvable files
+
+`AdrevoConfig.evolvable_files` is the explicit allowlist of complete files Adrevo may modify. Each `EvolvableFile(file, lang_identifier)` gives a project-relative path under `evo/` and the Markdown fence language used to exchange that file with the model. The default is `evo/main.py` as Python.
+
+Models return complete replacements for one or more allowlisted files; files omitted from a response remain unchanged. For example, allow the candidate's source and dependencies to evolve together:
+
+```python
+evolvable_files=(
+    EvolvableFile("evo/main.py", "python"),
+    EvolvableFile("evo/pyproject.toml", "toml"),
+)
+```
 
 Run a project with:
 
@@ -84,7 +97,7 @@ Start from the [circle-packing example](examples/circle_packing), especially its
 
 ## How search works
 
-1. Models propose a complete replacement for the configured `evo_file`; trusted `evaluate.py` runs it, validates its output, and reports a `combined_score`.
+1. Models propose complete replacements for one or more allowlisted candidate files; trusted `evaluate.py` runs them, validates their output, and reports a `combined_score`.
 2. A new global best becomes the committed search lineage. A local improvement can be explored as a side branch without replacing that lineage.
 3. If the final model in the configured model list cannot improve the current branch, adrevo backtracks one or more ancestors (`backtrack_steps`) and continues from there.
 

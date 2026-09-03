@@ -72,6 +72,7 @@ class AdrevoConfig:
     max_generations: int = 500
     evolvable_files: tuple[EvolvableFile, ...] = (
         EvolvableFile(file="evo/main.py", lang_identifier="python"),
+        EvolvableFile(file="evo/pyproject.toml", lang_identifier="toml")
     )
     evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
     use_probe: bool = True
