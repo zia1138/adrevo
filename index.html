@@ -325,6 +325,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evolvable-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Evolvable files
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -439,6 +456,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evolvable-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Evolvable files
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -504,7 +538,7 @@
 <p><img align="right" alt="adrevo" src="adrevo.png" /></p>
 <p>This page is the operational reference. For the quickstart and benchmark results, see the <a href="https://github.com/zia1138/adrevo#readme">README</a>.</p>
 <h2 id="execution-contract">Execution contract</h2>
-<p>Adrevo starts from the project directory passed to <code>adrevo run</code>: it loads <code>config.py</code>, reads the initial <code>evo/main.py</code>, and keeps the original directory unchanged. For each candidate, it creates a new temporary directory containing a copy of the project files and replaces only the configured <code>evo_file</code>. It then runs trusted <code>evaluate.py</code> in the root project's uv environment—the environment you define with the root <code>pyproject.toml</code>. Configured <code>data_dirs</code> are made available separately as benchmark input data.</p>
+<p>Adrevo starts from the project directory passed to <code>adrevo run</code>: it loads <code>config.py</code>, reads every file in <code>AdrevoConfig.evolvable_files</code>, and keeps the original directory unchanged. For each candidate, it creates a new temporary directory containing a copy of the project files and replaces the allowlisted files returned by the model. It then runs trusted <code>evaluate.py</code> in the root project's uv environment—the environment you define with the root <code>pyproject.toml</code>. Configured <code>data_dirs</code> are made available separately as benchmark input data.</p>
 <p><code>evaluate.py</code> owns the rest of evaluation: it builds and runs the candidate, validates the candidate's output file, and writes <code>results.json</code>. Adrevo reads only that trusted result:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">&quot;correct&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;combined_score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.23</span><span class="p">}</span>
 </span></code></pre></div>
@@ -525,6 +559,7 @@
 <li><strong>Trusted evaluator:</strong> your root project's <code>pyproject.toml</code> defines the uv environment that runs <code>evaluate.py</code>. It is separate from Adrevo's controller dependencies.</li>
 <li><strong>Candidate:</strong> <code>evaluate.py</code> chooses how to build and run <code>evo/</code>: uv, Cargo, Go, Node, Docker, or another runtime.</li>
 </ul>
+<p>Manage dependencies for evolved code in <code>evo/</code> yourself—for example, in <code>evo/pyproject.toml</code>. Adrevo does not install or list them.</p>
 <p>The Ray backend runs the evaluator with <code>uv -q run --project . python evaluate.py</code>. A Python evaluator can run a uv-based candidate with, for example:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="p">[</span><span class="s2">&quot;uv&quot;</span><span class="p">,</span> <span class="s2">&quot;run&quot;</span><span class="p">,</span> <span class="s2">&quot;--directory&quot;</span><span class="p">,</span> <span class="s2">&quot;evo&quot;</span><span class="p">,</span> <span class="s2">&quot;python&quot;</span><span class="p">,</span> <span class="s2">&quot;main.py&quot;</span><span class="p">],</span>
@@ -550,7 +585,7 @@
 <tbody>
 <tr>
 <td><code>AdrevoConfig</code></td>
-<td><code>evo_file</code> (default <code>evo/main.py</code>), <code>lang_identifier</code>, models, worker count, generation/cost limits, strategies, and backtracking</td>
+<td><code>evolvable_files</code> (default: <code>evo/main.py</code> as Python), models, worker count, generation/cost limits, strategies, and backtracking</td>
 </tr>
 <tr>
 <td><code>BackendConfig</code></td>
@@ -558,6 +593,14 @@
 </tr>
 </tbody>
 </table>
+<h3 id="evolvable-files">Evolvable files</h3>
+<p><code>evolvable_files</code> is the explicit allowlist of complete candidate files Adrevo may modify. Every <code>EvolvableFile(file, lang_identifier)</code> must be under <code>evo/</code>; its language identifier tells Adrevo which Markdown code fence to use for that file. A model may return replacements for one or more allowlisted files. Files omitted from a response remain unchanged.</p>
+<p>For example, evolve source and its candidate dependency manifest together:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">evolvable_files</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">EvolvableFile</span><span class="p">(</span><span class="s2">&quot;evo/main.py&quot;</span><span class="p">,</span> <span class="s2">&quot;python&quot;</span><span class="p">),</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">EvolvableFile</span><span class="p">(</span><span class="s2">&quot;evo/pyproject.toml&quot;</span><span class="p">,</span> <span class="s2">&quot;toml&quot;</span><span class="p">),</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">)</span>
+</span></code></pre></div>
 <p><code>data_dirs</code> are staged once per worker node and made available in each temporary project directory. They should be treated as benchmark-owned input data.</p>
 <h2 id="commands">Commands</h2>
 <table>
@@ -587,17 +630,17 @@
 </tbody>
 </table>
 <p>For example:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>adrevo<span class="w"> </span>run<span class="w"> </span>examples/circle_packing<span class="w"> </span>--config<span class="w"> </span>config_openai.py
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>adrevo<span class="w"> </span>run<span class="w"> </span>examples/circle_packing<span class="w"> </span>--config<span class="w"> </span>config_openai.py
 </span></code></pre></div>
 <p>Use <code>adrevo COMMAND --help</code> for the complete option list.</p>
 <h2 id="operations">Operations</h2>
 <p>Resume with the same project and results base:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>adrevo<span class="w"> </span>run<span class="w"> </span>my-project<span class="w"> </span>--results-dir<span class="w"> </span>./results
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>adrevo<span class="w"> </span>resume<span class="w"> </span>my-project<span class="w"> </span>--results-dir<span class="w"> </span>./results
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>adrevo<span class="w"> </span>run<span class="w"> </span>my-project<span class="w"> </span>--results-dir<span class="w"> </span>./results
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>adrevo<span class="w"> </span>resume<span class="w"> </span>my-project<span class="w"> </span>--results-dir<span class="w"> </span>./results
 </span></code></pre></div>
 <p>The resumable directory is <code>./results/my-project/</code>; it contains <code>database_state.json</code>, <code>evogen_state.json</code>, and one <code>&lt;program-id&gt;.zip</code> per saved program. In-flight work is not resumed.</p>
 <p>For several projects:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>adrevo<span class="w"> </span>run-folder<span class="w"> </span>project-a<span class="w"> </span>project-b<span class="w"> </span>--results-dir<span class="w"> </span>./results<span class="w"> </span>--max-concurrent<span class="w"> </span><span class="m">2</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>adrevo<span class="w"> </span>run-folder<span class="w"> </span>project-a<span class="w"> </span>project-b<span class="w"> </span>--results-dir<span class="w"> </span>./results<span class="w"> </span>--max-concurrent<span class="w"> </span><span class="m">2</span>
 </span></code></pre></div>
 <p>Project directory names must be distinct. To connect to Ray Client, pass <code>--ray-address ray://HOST:10001</code> (or <code>--ray-ip HOST --ray-port 10001</code>). Use <code>--verbose</code> for Logfire logs and Pydantic AI traces; on a cluster, provide <code>.logfire/</code> credentials or <code>LOGFIRE_TOKEN</code> on every node.</p>
 <h2 id="common-failures">Common failures</h2>
