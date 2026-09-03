@@ -207,7 +207,7 @@ class ModalExecutionBackend(ExecutionBackend):
         pass
 
     def _build_command(self) -> List[str]:
-        return ["uv", "-qq", "run", "--project", ".", "python", "evaluate.py"]
+        return ["uv", "run", "-qq", "--project", ".", "python", "evaluate.py"]
 
     def run_job(
         self,
