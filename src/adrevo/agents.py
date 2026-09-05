@@ -16,7 +16,7 @@ from pydantic_ai.usage import RunUsage
 
 from adrevo.config import AdrevoConfig, ModelSpec
 from adrevo.database import Program, ProgramDatabase
-from adrevo.ray_backend import RayExecutionBackend
+from adrevo.evaluator import run_evaluator
 from adrevo.utils import (
     extract_file_to_string,
     extract_file_replacements,
@@ -360,8 +360,8 @@ class AdrevoWorker:
     """
     adrevo worker
 
-    NOTE: Each worker reserves one CPU because it runs local evaluation
-    subprocesses through RayExecutionBackend.
+    NOTE: Each worker reserves one CPU because it runs local evaluator
+    subprocesses.
     """
     def __init__(
         self,
@@ -379,12 +379,6 @@ class AdrevoWorker:
         self.db = db
         self.model_coordinator = model_coordinator
         self.verbose = verbose
-
-        self.backend = RayExecutionBackend(
-            evaluator_file=evo_config.evaluate_file,
-            evaluator_timeout_sec=evo_config.evaluator_timeout_sec,
-            verbose=verbose,
-        )
 
         global _logging_configured
         if self.verbose:
@@ -422,32 +416,31 @@ class AdrevoWorker:
 
     def run(self):
         """Main agent loop for the worker."""
-        with self.backend:
-            cur_cost: float = ray.get(self.state.compute_cost.remote())
-            while True:
-                if self.cancellation_requested():
-                    break
+        cur_cost: float = ray.get(self.state.compute_cost.remote())
+        while True:
+            if self.cancellation_requested():
+                break
 
-                current_gen: int = ray.get(self.state.next_gen.remote())
-                self.agent_run(current_gen, cur_cost)
+            current_gen: int = ray.get(self.state.next_gen.remote())
+            self.agent_run(current_gen, cur_cost)
 
-                if self.cancellation_requested():
-                    break
+            if self.cancellation_requested():
+                break
 
-                if current_gen >= self.evo_config.max_generations - 1:
-                    logger.info(
-                        f"Worker {self.worker_id}: Reached max generations "
-                        f"({self.evo_config.max_generations}). Stopping evolution."
-                    )
-                    break
+            if current_gen >= self.evo_config.max_generations - 1:
+                logger.info(
+                    f"Worker {self.worker_id}: Reached max generations "
+                    f"({self.evo_config.max_generations}). Stopping evolution."
+                )
+                break
 
-                cur_cost = ray.get(self.state.compute_cost.remote())
-                if cur_cost >= self.evo_config.max_cost:
-                    logger.info(
-                        f"Worker {self.worker_id}: Current cost ({cur_cost}) exceeds "
-                        f"max cost {self.evo_config.max_cost}. Stopping evolution."
-                    )
-                    break
+            cur_cost = ray.get(self.state.compute_cost.remote())
+            if cur_cost >= self.evo_config.max_cost:
+                logger.info(
+                    f"Worker {self.worker_id}: Current cost ({cur_cost}) exceeds "
+                    f"max cost {self.evo_config.max_cost}. Stopping evolution."
+                )
+                break
 
     def agent_run(self, current_gen: int, cur_cost: float):
         """Run one generation against one claimed parent program."""
@@ -837,9 +830,12 @@ class AdrevoWorker:
         """
         candidate_files = dict(context.parent.files)
         candidate_files.update(file_replacements)
-        results, runtime_sec, result_zip_bytes = self.backend.run_job(
+        results, runtime_sec, result_zip_bytes = run_evaluator(
             parent_zip_bytes=context.current_zip_bytes,
             file_replacements=file_replacements,
+            evaluator_file=self.evo_config.evaluate_file,
+            evaluator_timeout_sec=self.evo_config.evaluator_timeout_sec,
+            verbose=self.verbose,
             preempt_db=self.db,
             preempt_claim_id=context.claim_id,
         )
@@ -911,9 +907,12 @@ class AdrevoWorker:
         context: ParentRunContext,
         file_replacements: dict[str, str],
     ) -> str:
-        results, _, _ = self.backend.run_job(
+        results, _, _ = run_evaluator(
             parent_zip_bytes=context.current_zip_bytes,
             file_replacements=file_replacements,
+            evaluator_file=self.evo_config.evaluate_file,
+            evaluator_timeout_sec=self.evo_config.evaluator_timeout_sec,
+            verbose=self.verbose,
             preempt_db=self.db,
             preempt_claim_id=context.claim_id,
         )

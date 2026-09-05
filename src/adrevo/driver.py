@@ -8,7 +8,7 @@ import ray
 from adrevo.database import ProgramDatabase, Program
 from adrevo.agents import AdrevoModelCoordinator, AdrevoState, AdrevoWorker
 from adrevo.config import AdrevoConfig
-from adrevo.ray_backend import RayExecutionBackend
+from adrevo.evaluator import run_evaluator
 from adrevo.utils import zip_dir_to_bytes
 import logfire
 
@@ -72,13 +72,6 @@ class AdrevoDriver:
             resume_dir=str(self.resume_from) if self.resume_from is not None else None,
         )
 
-        # TODO: Allow modal, beam.could and other backends here.
-        self.backend = RayExecutionBackend(
-            evaluator_file=evo_config.evaluate_file,
-            evaluator_timeout_sec=evo_config.evaluator_timeout_sec,
-            verbose=verbose,
-        )
-
     def run_ray(self):
         """Ray based evolution."""
         all_refs = []
@@ -91,8 +84,7 @@ class AdrevoDriver:
 
             try:
                 if self.resume_from is None:
-                    with self.backend:
-                        self._run_generation_0()
+                    self._run_generation_0()
 
                 state = AdrevoState.remote(
                     self.evo_config,
@@ -244,9 +236,12 @@ class AdrevoDriver:
         parent_zip_bytes = zip_dir_to_bytes(self.project_dir)
 
         # Run the evaluation code using the Ray backend.
-        results, rtime, result_zip_bytes = self.backend.run_job(
+        results, rtime, result_zip_bytes = run_evaluator(
             parent_zip_bytes=parent_zip_bytes,
             file_replacements={},
+            evaluator_file=self.evo_config.evaluate_file,
+            evaluator_timeout_sec=self.evo_config.evaluator_timeout_sec,
+            verbose=self.verbose,
         )
 
         if results.get('correct'):

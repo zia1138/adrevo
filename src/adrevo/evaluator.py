@@ -9,7 +9,6 @@ from typing import Tuple, Dict, Any, List
 
 import ray
 
-from adrevo.execution import ExecutionBackend
 from adrevo.utils import (
     zip_dir_to_bytes,
     extract_parent_bytes_to_dir,
@@ -177,60 +176,42 @@ def _run_evaluator_task(
         # 5. Zip the entire temp directory and return.
         return zip_dir_to_bytes(temp_dir)
 
-class RayExecutionBackend(ExecutionBackend):
-    """
-    Ray-based implementation of the execution backend.
-    It executes jobs synchronously in the current Ray actor or driver process.
-    """
-    def __init__(
-        self,
-        evaluator_file: str,
-        evaluator_timeout_sec: int | None,
-        verbose: bool = True,
-    ):
-        self.evaluator_file = evaluator_file
-        self.evaluator_timeout_sec = evaluator_timeout_sec
-        self.verbose = verbose
+def run_evaluator(
+    parent_zip_bytes: bytes,
+    file_replacements: Dict[str, str],
+    evaluator_file: str,
+    evaluator_timeout_sec: int | None,
+    verbose: bool = False,
+    preempt_db: Any | None = None,
+    preempt_claim_id: str | None = None,
+) -> Tuple[Dict[str, Any], float, bytes]:
+    """Evaluate candidate file replacements with the trusted evaluator."""
+    cmd = ["uv", "run", "-qq", "--project", ".", "python", evaluator_file]
+    started_at = time.time()
 
-    def _build_command(self) -> List[str]:
-        # The evaluator runs from the extracted project directory. Select it
-        # explicitly instead of relying on an inherited active environment.
-        return ["uv", "run", "-qq", "--project", ".", "python", self.evaluator_file]
+    if verbose:
+        logger.info("Running evaluator with replacements for %s", ", ".join(file_replacements))
 
-    def run_job(
-        self,
-        parent_zip_bytes: bytes,
-        file_replacements: Dict[str, str],
-        preempt_db: Any | None = None,
-        preempt_claim_id: str | None = None,
-    ) -> Tuple[Dict[str, Any], float, bytes]:
+    result_zip_bytes = _run_evaluator_task(
+        parent_zip_bytes=parent_zip_bytes,
+        file_replacements=file_replacements,
+        cmd=cmd,
+        timeout_sec=evaluator_timeout_sec,
+        preempt_db=preempt_db,
+        preempt_claim_id=preempt_claim_id,
+    )
+    runtime_sec = time.time() - started_at
+    results = parse_results_from_zip(result_zip_bytes)
+    returncode = results.get("returncode")
 
-        cmd = self._build_command()
-
-        t0 = time.time()
-
-        if self.verbose:
-            logger.info("Running job with replacements for %s", ", ".join(file_replacements))
-
-        result_zip_bytes: bytes = _run_evaluator_task(
-            parent_zip_bytes=parent_zip_bytes,
-            file_replacements=file_replacements,
-            cmd=cmd,
-            timeout_sec=self.evaluator_timeout_sec,
-            preempt_db=preempt_db,
-            preempt_claim_id=preempt_claim_id,
+    if verbose:
+        logger.info(
+            "Evaluator completed in %.2fs with return code: %s",
+            runtime_sec,
+            returncode,
         )
-        rtime = time.time() - t0
 
-        # Parse the results directly from the zip bytes
-        results = parse_results_from_zip(result_zip_bytes)
-        returncode = results.get("returncode")
+    if returncode is not None and returncode != 0:
+        results["stderr_log"] += f"\nProcess failed with return code {returncode}."
 
-        if self.verbose:
-            logger.info(f"Job completed in {rtime:.2f}s with return code: {returncode}")
-
-        # Communicate this failure back to LLM by appending to stderr_log.
-        if returncode is not None and returncode != 0:
-            results["stderr_log"] += f"\nProcess failed with return code {returncode}."
-
-        return results, rtime, result_zip_bytes
+    return results, runtime_sec, result_zip_bytes
