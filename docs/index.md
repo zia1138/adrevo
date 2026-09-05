@@ -54,15 +54,13 @@ The candidate may instead be a non-Python program; only its output format is ben
 Configuration is Python. `config.py` or `config_*.py` must define:
 
 - `get_adrevo_config()`, returning `AdrevoConfig`;
-- `get_backend_config()`, returning `BackendConfig`;
 - `build_evo_models()`, used by `AdrevoConfig` to create one or more `ModelSpec`s.
 
 Important settings:
 
 | Object | Fields |
 |---|---|
-| `AdrevoConfig` | `evolvable_files` (default: `evo/main.py` as Python), models, worker count, generation/cost limits, strategies, and backtracking |
-| `BackendConfig` | evaluator `timeout_sec` |
+| `AdrevoConfig` | `evolvable_files` (default: `evo/main.py` as Python), `evaluator_timeout_sec`, models, worker count, generation/cost limits, strategies, and backtracking |
 
 ### Evolvable files
 

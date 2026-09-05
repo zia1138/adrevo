@@ -9,10 +9,7 @@ from pathlib import Path
 import questionary
 import ray
 
-from adrevo.config import AdrevoConfig
-from adrevo.config import BackendConfig
-from adrevo.config import validate_adrevo
-from adrevo.config import validate_backend
+from adrevo.config import AdrevoConfig, validate_adrevo
 from adrevo.driver import AdrevoDriver
 
 app = typer.Typer()
@@ -24,13 +21,12 @@ class ProjectRun:
     config_file: Path
     results_dir: Path
     adrevo_cfg: AdrevoConfig
-    backend_cfg: BackendConfig
 
 
 def load_config_file(config_file: Path) -> dict:
     """
     We use a code as config system so runpy runs config.py to populate the namespace.
-    We expect config.py to define get_adrevo_config() and get_backend_config().
+    We expect config.py to define get_adrevo_config().
     The rest is up to the user.
     """
     if not config_file.exists():
@@ -134,18 +130,13 @@ def _resolve_project_config(
     return _prompt_for_config(project_dir, candidates)
 
 
-def _load_project_configs(config_file: Path, project_dir: Path) -> tuple[AdrevoConfig, BackendConfig]:
+def _load_project_config(config_file: Path, project_dir: Path) -> AdrevoConfig:
     ns = load_config_file(config_file)
 
     get_adrevo_config = ns.get("get_adrevo_config")
-    get_backend_config = ns.get("get_backend_config")
     if not callable(get_adrevo_config):
         raise typer.BadParameter(
             f"{config_file.name} in {project_dir} must define get_adrevo_config()"
-        )
-    if not callable(get_backend_config):
-        raise typer.BadParameter(
-            f"{config_file.name} in {project_dir} must define get_backend_config()"
         )
 
     try:
@@ -155,28 +146,16 @@ def _load_project_configs(config_file: Path, project_dir: Path) -> tuple[AdrevoC
             f"get_adrevo_config() in {config_file.name} failed: {exc}"
         ) from exc
 
-    try:
-        backend_cfg: BackendConfig = get_backend_config()
-    except Exception as exc:
-        raise typer.BadParameter(
-            f"get_backend_config() in {config_file.name} failed: {exc}"
-        ) from exc
     if not isinstance(adrevo_cfg, AdrevoConfig):
         raise typer.BadParameter(
             f"get_adrevo_config() in {config_file.name} must return AdrevoConfig, "
             f"got {type(adrevo_cfg).__name__}"
         )
-    if not isinstance(backend_cfg, BackendConfig):
-        raise typer.BadParameter(
-            f"get_backend_config() in {config_file.name} must return BackendConfig, "
-            f"got {type(backend_cfg).__name__}"
-        )
     try:
         validate_adrevo(adrevo_cfg)
-        validate_backend(backend_cfg)
     except (TypeError, ValueError) as exc:
         raise typer.BadParameter(f"Invalid config in {config_file.name}: {exc}") from exc
-    return adrevo_cfg, backend_cfg
+    return adrevo_cfg
 
 
 def _validate_port(ctx: typer.Context, param: typer.CallbackParam, value: int) -> int:
@@ -194,7 +173,6 @@ def _validate_max_concurrent(ctx: typer.Context, param: typer.CallbackParam, val
 def _validate_initial_project_inputs(
     project_dir: Path,
     adrevo_cfg: AdrevoConfig,
-    backend_cfg: BackendConfig,
 ) -> None:
     """Validate files and directories needed before a Ray session starts."""
     for evolvable_file in adrevo_cfg.evolvable_files:
@@ -284,14 +262,13 @@ def _prepare_project_run(
         non_interactive=non_interactive,
         allow_absolute_config=allow_absolute_config,
     )
-    adrevo_cfg, backend_cfg = _load_project_configs(config_file, project_path)
-    _validate_initial_project_inputs(project_path, adrevo_cfg, backend_cfg)
+    adrevo_cfg = _load_project_config(config_file, project_path)
+    _validate_initial_project_inputs(project_path, adrevo_cfg)
     return ProjectRun(
         project_dir=project_path,
         config_file=config_file,
         results_dir=_resolve_results_dir(project_path, results_base),
         adrevo_cfg=adrevo_cfg,
-        backend_cfg=backend_cfg,
     )
 
 
@@ -336,7 +313,6 @@ def _run_single_project(
     """Run evolution for a prepared project."""
     adrevo_driver = AdrevoDriver(
         project_run.adrevo_cfg,
-        project_run.backend_cfg,
         str(project_run.project_dir),
         results_dir=project_run.results_dir,
         verbose=verbose,

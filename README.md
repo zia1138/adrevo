@@ -72,7 +72,7 @@ my-project/
     └── pyproject.toml # candidate dependencies, if it uses uv
 ```
 
-`config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` and `get_backend_config()` there, and define `build_evo_models()` for the models Adrevo uses to evolve the candidate.
+`config.py` is ordinary Python—not YAML. Define `get_adrevo_config()` there, and define `build_evo_models()` for the models Adrevo uses to evolve the candidate.
 
 ### Multiple evolvable files
 

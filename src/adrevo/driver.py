@@ -7,7 +7,7 @@ from pathlib import Path
 import ray
 from adrevo.database import ProgramDatabase, Program
 from adrevo.agents import AdrevoModelCoordinator, AdrevoState, AdrevoWorker
-from adrevo.config import AdrevoConfig, BackendConfig
+from adrevo.config import AdrevoConfig
 from adrevo.ray_backend import RayExecutionBackend
 from adrevo.utils import zip_dir_to_bytes
 import logfire
@@ -21,14 +21,12 @@ class AdrevoDriver:
     def __init__(
         self,
         evo_config: AdrevoConfig,
-        backend_config: BackendConfig,
         project_dir: str | Path,
         results_dir: Path,
         verbose: bool = False,
         resume_from: Path | None = None,
     ):
         self.evo_config = evo_config
-        self.backend_config = backend_config
         self.project_dir = Path(project_dir)
         self.results_dir = Path(results_dir)
         self.verbose = verbose
@@ -76,8 +74,8 @@ class AdrevoDriver:
 
         # TODO: Allow modal, beam.could and other backends here.
         self.backend = RayExecutionBackend(
-            config=backend_config,
             evaluator_file=evo_config.evaluate_file,
+            evaluator_timeout_sec=evo_config.evaluator_timeout_sec,
             verbose=verbose,
         )
 
@@ -114,7 +112,6 @@ class AdrevoDriver:
                             f"agent_{agent_id}",
                             state,
                             self.evo_config,
-                            self.backend_config,
                             self.db,
                             model_coordinator,
                             self.verbose,

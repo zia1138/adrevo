@@ -1,6 +1,6 @@
 import textwrap
 
-from adrevo.config import AdrevoConfig, BackendConfig, ModelSpec
+from adrevo.config import AdrevoConfig, ModelSpec
 from pydantic_ai.models.cerebras import CerebrasModel, CerebrasModelSettings
 from pydantic_ai.providers.cerebras import CerebrasProvider
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
@@ -84,7 +84,5 @@ def get_adrevo_config() -> AdrevoConfig:
         pr_no_strategy=pr_no_strategy,
         pr_strategies=pr_strategies,
         max_cost=5.0,
+        evaluator_timeout_sec=120,
     )
-
-def get_backend_config() -> BackendConfig:
-    return BackendConfig(timeout_sec=120)

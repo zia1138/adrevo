@@ -9,7 +9,6 @@ from typing import Tuple, Dict, Any, List
 
 import ray
 
-from adrevo.config import BackendConfig
 from adrevo.execution import ExecutionBackend
 from adrevo.utils import (
     zip_dir_to_bytes,
@@ -59,13 +58,13 @@ def _should_preempt_work(
 def _run_preemptible_subprocess(
     cmd: List[str],
     cwd: str,
-    timeout_sec: int,
+    timeout_sec: int | None,
     stdout_path: Path,
     stderr_path: Path,
     preempt_db: Any | None = None,
     preempt_claim_id: str | None = None,
 ) -> tuple[int, bool, bool]:
-    deadline = time.monotonic() + timeout_sec
+    deadline = time.monotonic() + timeout_sec if timeout_sec is not None else None
     preempted = False
     timed_out = False
 
@@ -80,7 +79,7 @@ def _run_preemptible_subprocess(
         )
 
         while proc.poll() is None:
-            if time.monotonic() >= deadline:
+            if deadline is not None and time.monotonic() >= deadline:
                 timed_out = True
                 _terminate_process_group(proc)
                 break
@@ -108,7 +107,7 @@ def _run_evaluator_task(
     parent_zip_bytes: bytes,
     file_replacements: Dict[str, str],
     cmd: List[str],
-    timeout_sec: int,
+    timeout_sec: int | None,
     preempt_db: Any | None = None,
     preempt_claim_id: str | None = None,
 ) -> bytes:
@@ -185,12 +184,12 @@ class RayExecutionBackend(ExecutionBackend):
     """
     def __init__(
         self,
-        config: BackendConfig,
         evaluator_file: str,
+        evaluator_timeout_sec: int | None,
         verbose: bool = True,
     ):
-        self.config = config
         self.evaluator_file = evaluator_file
+        self.evaluator_timeout_sec = evaluator_timeout_sec
         self.verbose = verbose
 
     def _build_command(self) -> List[str]:
@@ -217,7 +216,7 @@ class RayExecutionBackend(ExecutionBackend):
             parent_zip_bytes=parent_zip_bytes,
             file_replacements=file_replacements,
             cmd=cmd,
-            timeout_sec=self.config.timeout_sec,
+            timeout_sec=self.evaluator_timeout_sec,
             preempt_db=preempt_db,
             preempt_claim_id=preempt_claim_id,
         )

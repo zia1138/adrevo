@@ -14,7 +14,7 @@ import ray
 from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
 
-from adrevo.config import AdrevoConfig, BackendConfig, ModelSpec
+from adrevo.config import AdrevoConfig, ModelSpec
 from adrevo.database import Program, ProgramDatabase
 from adrevo.ray_backend import RayExecutionBackend
 from adrevo.utils import (
@@ -368,7 +368,6 @@ class AdrevoWorker:
         worker_id: str,
         state: AdrevoState,
         evo_config: AdrevoConfig,
-        backend_config: BackendConfig,
         db: ProgramDatabase,
         model_coordinator: AdrevoModelCoordinator,
         verbose: bool,
@@ -382,8 +381,8 @@ class AdrevoWorker:
         self.verbose = verbose
 
         self.backend = RayExecutionBackend(
-            config=backend_config,
             evaluator_file=evo_config.evaluate_file,
+            evaluator_timeout_sec=evo_config.evaluator_timeout_sec,
             verbose=verbose,
         )
 

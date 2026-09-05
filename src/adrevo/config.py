@@ -56,6 +56,8 @@ class AdrevoConfig:
         evolvable_files: Candidate-owned files Adrevo may edit. Each file has
             its own language identifier for LLM code blocks.
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
+        evaluator_timeout_sec: Maximum seconds for trusted evaluate.py to run.
+            Set to None to disable the timeout.
         use_probe: Whether to run diagnostic probing during the multi-turn loop.
         dl_evostate_freq: Frequency (in seconds) to download evo state from workers and database.
         model_wait_poll_sec: Frequency (in seconds) to poll for model availability (limited by leases).
@@ -75,6 +77,7 @@ class AdrevoConfig:
         EvolvableFile(file="evo/pyproject.toml", lang_identifier="toml")
     )
     evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
+    evaluator_timeout_sec: int | None = 10 * 60
     use_probe: bool = True
     dl_evostate_freq: float = 30
     model_wait_poll_sec: float = 2.0
@@ -136,6 +139,13 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
             raise ValueError(f"Duplicate evolvable file: {evolvable_file.file}")
         seen_evolvable_files.add(evolvable_file.file)
     _validate_relative_path(cfg.evaluate_file, "AdrevoConfig.evaluate_file")
+    if (
+        cfg.evaluator_timeout_sec is not None
+        and not _is_positive_int(cfg.evaluator_timeout_sec)
+    ):
+        raise ValueError(
+            "AdrevoConfig.evaluator_timeout_sec must be None or an integer >= 1"
+        )
     if not isinstance(cfg.dl_evostate_freq, (int, float)) or cfg.dl_evostate_freq <= 0:
         raise ValueError("AdrevoConfig.dl_evostate_freq must be a positive number")
     if (
@@ -176,25 +186,6 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
         raise ValueError(
             "AdrevoConfig.pr_no_strategy + sum(pr_strategies) must equal 1.0"
         )
-
-@dataclass(frozen=True)
-class BackendConfig:
-    """
-    Configuration for trusted evaluator execution with uv.
-
-    Attributes:
-        timeout_sec: Optional timeout in seconds for script execution. If None, no timeout is applied
-    """
-    timeout_sec: int = 10 * 60
-
-
-def validate_backend(cfg: BackendConfig) -> None:
-    """Validate the BackendConfig object."""
-    if not isinstance(cfg, BackendConfig):
-        raise TypeError(f"Expected BackendConfig, got {type(cfg).__name__}")
-    if cfg.timeout_sec is not None and not _is_positive_int(cfg.timeout_sec):
-        raise ValueError("BackendConfig.timeout_sec must be None or an integer >= 1")
-
 
 def _validate_relative_path(value: str, field_name: str) -> None:
     if not isinstance(value, str) or not value.strip():

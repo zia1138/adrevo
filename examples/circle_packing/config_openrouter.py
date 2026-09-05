@@ -1,6 +1,6 @@
 import textwrap
 
-from adrevo.config import AdrevoConfig, BackendConfig, ModelSpec
+from adrevo.config import AdrevoConfig, ModelSpec
 from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
 from pydantic_ai.providers.openrouter import OpenRouterProvider 
 
@@ -75,8 +75,5 @@ def get_adrevo_config() -> AdrevoConfig:
         input_token_cost=0.35,
         output_token_cost=0.75,
         max_cost=5.0,
+        evaluator_timeout_sec=60,
     )
-
-
-def get_backend_config() -> BackendConfig:
-    return BackendConfig(timeout_sec=60)
