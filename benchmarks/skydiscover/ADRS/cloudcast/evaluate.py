@@ -1,10 +1,14 @@
 """Evaluator for CloudCast cloud broadcast optimization."""
 
+import fcntl
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import traceback
+import urllib.request
 from pathlib import Path
 from typing import Dict, List
 from types import SimpleNamespace
@@ -13,18 +17,80 @@ import networkx as nx
 import pandas as pd
 
 
-def make_reference_graph(cost_path=None, throughput_path=None, num_vms=1):
+_DATASET_VERSION = "cloudcast-v1"
+_DATASET_BASE_URL = (
+    "https://huggingface.co/datasets/f20180301/adrs-data/resolve/main/cloudcast"
+)
+_DATASET_FILES = (
+    "profiles/cost.csv",
+    "profiles/throughput.csv",
+    "examples/config/intra_aws.json",
+    "examples/config/intra_azure.json",
+    "examples/config/intra_gcp.json",
+    "examples/config/inter_agz.json",
+    "examples/config/inter_gaz2.json",
+)
+
+
+def _dataset_cache_dir() -> Path:
+    return Path.home() / ".cache" / "adrevo" / "datasets" / _DATASET_VERSION
+
+
+def _dataset_is_ready(dataset_dir: Path) -> bool:
+    return all((dataset_dir / relative_path).is_file() for relative_path in _DATASET_FILES)
+
+
+def ensure_cloudcast_data() -> Path:
+    """Return the node-local Cloudcast dataset, downloading it once if needed."""
+    dataset_dir = _dataset_cache_dir()
+    if _dataset_is_ready(dataset_dir):
+        return dataset_dir
+
+    dataset_dir.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = dataset_dir.parent / f".{_DATASET_VERSION}.lock"
+    with lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            if _dataset_is_ready(dataset_dir):
+                return dataset_dir
+
+            if dataset_dir.exists():
+                shutil.rmtree(dataset_dir)
+            staging_dir = Path(
+                tempfile.mkdtemp(
+                    prefix=f".{_DATASET_VERSION}.",
+                    dir=dataset_dir.parent,
+                )
+            )
+            try:
+                for relative_path in _DATASET_FILES:
+                    target = staging_dir / relative_path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    urllib.request.urlretrieve(
+                        f"{_DATASET_BASE_URL}/{relative_path}",
+                        target,
+                    )
+                if not _dataset_is_ready(staging_dir):
+                    raise RuntimeError("Cloudcast dataset download was incomplete")
+                staging_dir.replace(dataset_dir)
+            finally:
+                if staging_dir.exists():
+                    shutil.rmtree(staging_dir)
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+    return dataset_dir
+
+
+def make_reference_graph(data_dir: Path, num_vms=1):
     """Build the evaluator-owned graph from the benchmark profiles.
 
     This deliberately lives in the evaluator rather than ``main.py``: candidate
     code is allowed to change ``main.py`` and therefore must not define the data
     against which its answer is checked.
     """
-    eval_dir = os.path.dirname(os.path.abspath(__file__))
-    cost = pd.read_csv(cost_path or os.path.join(eval_dir, "profiles/cost.csv"))
-    throughput = pd.read_csv(
-        throughput_path or os.path.join(eval_dir, "profiles/throughput.csv")
-    )
+    cost = pd.read_csv(data_dir / "profiles/cost.csv")
+    throughput = pd.read_csv(data_dir / "profiles/throughput.csv")
 
     graph = nx.DiGraph()
     for _, row in throughput.iterrows():
@@ -295,17 +361,16 @@ def canonicalize_paths(bc_t, terminal_nodes, num_partitions, reference_graph):
 
 if __name__ == "__main__":
     try:
-        # Configuration files (relative to evaluate.py location)
-        eval_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = ensure_cloudcast_data()
         config_files = [
-            os.path.join(eval_dir, "examples/config/intra_aws.json"),
-            os.path.join(eval_dir, "examples/config/intra_azure.json"),
-            os.path.join(eval_dir, "examples/config/intra_gcp.json"),
-            os.path.join(eval_dir, "examples/config/inter_agz.json"),
-            os.path.join(eval_dir, "examples/config/inter_gaz2.json")
+            data_dir / "examples/config/intra_aws.json",
+            data_dir / "examples/config/intra_azure.json",
+            data_dir / "examples/config/intra_gcp.json",
+            data_dir / "examples/config/inter_agz.json",
+            data_dir / "examples/config/inter_gaz2.json",
         ]
 
-        existing_configs = [f for f in config_files if os.path.exists(f)]
+        existing_configs = [path for path in config_files if path.is_file()]
 
         if not existing_configs:
             result = {"correct": False, "error": f"No configuration files found. Checked: {config_files}", "combined_score": 0.0}
@@ -324,7 +389,7 @@ if __name__ == "__main__":
                     config_name = os.path.basename(jsonfile).split(".")[0]
                     config = json.loads(f.read())
 
-                reference_graph = make_reference_graph(num_vms=int(num_vms))
+                reference_graph = make_reference_graph(data_dir, num_vms=int(num_vms))
 
                 source_node = config["source_node"]
                 terminal_nodes = config["dest_nodes"]
@@ -382,7 +447,7 @@ if __name__ == "__main__":
                 print(f"Config {config_name}: cost={cost:.2f}")
 
             except Exception as e:
-                print(f"Failed to process {os.path.basename(jsonfile)}: {str(e)}")
+                print(f"Failed to process {jsonfile.name}: {str(e)}")
                 failed_configs += 1
                 break
 

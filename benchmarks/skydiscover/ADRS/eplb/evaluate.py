@@ -1,20 +1,70 @@
 """Evaluator for EPLB (Expert Parallelism Load Balancer)."""
 
+import fcntl
 import json
 import functools
 import time
 import traceback
-import os
+import shutil
 import subprocess
+import tempfile
+import urllib.request
 from pathlib import Path
 
 import torch
 
 
+_DATASET_VERSION = "eplb-v1"
+_DATASET_URL = (
+    "https://huggingface.co/datasets/abmfy/eplb-openevolve/resolve/main/"
+    "expert-load.json"
+)
+_DATASET_FILE = "expert-load.json"
+
+
+def _dataset_cache_dir() -> Path:
+    return Path.home() / ".cache" / "adrevo" / "datasets" / _DATASET_VERSION
+
+
+def ensure_eplb_data() -> Path:
+    """Return the node-local EPLB dataset, downloading it once if needed."""
+    dataset_dir = _dataset_cache_dir()
+    dataset_path = dataset_dir / _DATASET_FILE
+    if dataset_path.is_file():
+        return dataset_dir
+
+    dataset_dir.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = dataset_dir.parent / f".{_DATASET_VERSION}.lock"
+    with lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            if dataset_path.is_file():
+                return dataset_dir
+
+            if dataset_dir.exists():
+                shutil.rmtree(dataset_dir)
+            staging_dir = Path(
+                tempfile.mkdtemp(
+                    prefix=f".{_DATASET_VERSION}.",
+                    dir=dataset_dir.parent,
+                )
+            )
+            try:
+                urllib.request.urlretrieve(_DATASET_URL, staging_dir / _DATASET_FILE)
+                if not (staging_dir / _DATASET_FILE).is_file():
+                    raise RuntimeError("EPLB dataset download was incomplete")
+                staging_dir.replace(dataset_dir)
+            finally:
+                if staging_dir.exists():
+                    shutil.rmtree(staging_dir)
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+    return dataset_dir
+
+
 # ---------- Constants ----------
 
-_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-WORKLOAD_PATH = os.path.join(_CURRENT_DIR, "data/expert-load.json")
 REBALANCE_INTERVAL = 100
 
 NUM_REPLICAS = 288
@@ -24,7 +74,7 @@ NUM_NODES = 4
 
 
 @functools.cache
-def load_workloads(path: str) -> list[torch.Tensor]:
+def load_workloads(path: Path) -> list[torch.Tensor]:
     with open(path, "r") as f:
         data = json.load(f)
 
@@ -93,7 +143,7 @@ def simulate_inference(
 
 if __name__ == "__main__":
     try:
-        workloads = load_workloads(WORKLOAD_PATH)
+        workloads = load_workloads(ensure_eplb_data() / _DATASET_FILE)
         input_path = Path("evo/input.json")
         output_path = Path("evo/output.json")
         output_path.unlink(missing_ok=True)

@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-mkdir -p data
-wget -P data https://huggingface.co/datasets/abmfy/eplb-openevolve/resolve/main/expert-load.json
+set -euo pipefail
+
+DATA_DIR="${HOME}/.cache/adrevo/datasets/eplb-v1"
+mkdir -p "${DATA_DIR}"
+wget -q -O "${DATA_DIR}/expert-load.json" \
+    https://huggingface.co/datasets/abmfy/eplb-openevolve/resolve/main/expert-load.json
