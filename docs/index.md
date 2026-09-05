@@ -60,7 +60,7 @@ Important settings:
 
 | Object | Fields |
 |---|---|
-| `AdrevoConfig` | `evolvable_files` (default: `evo/main.py` as Python), `evaluator_timeout_sec`, models, worker count, generation/cost limits, strategies, and backtracking |
+| `AdrevoConfig` | `evolvable_files` (default: `evo/main.py` as Python), evaluator timeout and termination-grace settings, models, worker count, generation/cost limits, strategies, and backtracking |
 
 ### Evolvable files
 

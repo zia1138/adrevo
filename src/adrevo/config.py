@@ -58,6 +58,8 @@ class AdrevoConfig:
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
         evaluator_timeout_sec: Maximum seconds for trusted evaluate.py to run.
             Set to None to disable the timeout.
+        evaluator_termination_grace_sec: Seconds to wait after sending SIGTERM
+            to trusted evaluate.py before forcing termination.
         use_probe: Whether to run diagnostic probing during the multi-turn loop.
         dl_evostate_freq: Frequency (in seconds) to download evo state from workers and database.
         model_wait_poll_sec: Frequency (in seconds) to poll for model availability (limited by leases).
@@ -78,6 +80,7 @@ class AdrevoConfig:
     )
     evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
     evaluator_timeout_sec: int | None = 10 * 60
+    evaluator_termination_grace_sec: int = 30
     use_probe: bool = True
     dl_evostate_freq: float = 30
     model_wait_poll_sec: float = 2.0
@@ -145,6 +148,14 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
     ):
         raise ValueError(
             "AdrevoConfig.evaluator_timeout_sec must be None or an integer >= 1"
+        )
+    if (
+        not isinstance(cfg.evaluator_termination_grace_sec, int)
+        or isinstance(cfg.evaluator_termination_grace_sec, bool)
+        or cfg.evaluator_termination_grace_sec < 0
+    ):
+        raise ValueError(
+            "AdrevoConfig.evaluator_termination_grace_sec must be an integer >= 0"
         )
     if not isinstance(cfg.dl_evostate_freq, (int, float)) or cfg.dl_evostate_freq <= 0:
         raise ValueError("AdrevoConfig.dl_evostate_freq must be a positive number")

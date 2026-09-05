@@ -22,11 +22,14 @@ _TIMEOUT_RETURNCODE = 255
 _PREEMPT_POLL_INTERVAL_SEC = 1.0
 
 
-def _terminate_process_group(proc: subprocess.Popen) -> None:
+def _terminate_process_group(
+    proc: subprocess.Popen,
+    termination_grace_sec: int,
+) -> None:
     """Terminate a subprocess and any children it spawned."""
     try:
         os.killpg(proc.pid, signal.SIGTERM)
-        proc.wait(timeout=5)
+        proc.wait(timeout=termination_grace_sec)
     except ProcessLookupError:
         return
     except Exception:
@@ -58,6 +61,7 @@ def _run_preemptible_subprocess(
     cmd: List[str],
     cwd: str,
     timeout_sec: int | None,
+    termination_grace_sec: int,
     stdout_path: Path,
     stderr_path: Path,
     preempt_db: Any | None = None,
@@ -80,7 +84,7 @@ def _run_preemptible_subprocess(
         while proc.poll() is None:
             if deadline is not None and time.monotonic() >= deadline:
                 timed_out = True
-                _terminate_process_group(proc)
+                _terminate_process_group(proc, termination_grace_sec)
                 break
 
             if _should_preempt_work(
@@ -88,7 +92,7 @@ def _run_preemptible_subprocess(
                 preempt_claim_id=preempt_claim_id,
             ):
                 preempted = True
-                _terminate_process_group(proc)
+                _terminate_process_group(proc, termination_grace_sec)
                 break
 
             time.sleep(_PREEMPT_POLL_INTERVAL_SEC)
@@ -107,6 +111,7 @@ def _run_evaluator_task(
     file_replacements: Dict[str, str],
     cmd: List[str],
     timeout_sec: int | None,
+    termination_grace_sec: int,
     preempt_db: Any | None = None,
     preempt_claim_id: str | None = None,
 ) -> bytes:
@@ -146,6 +151,7 @@ def _run_evaluator_task(
             cmd=cmd,
             cwd=temp_dir,
             timeout_sec=timeout_sec,
+            termination_grace_sec=termination_grace_sec,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
             preempt_db=preempt_db,
@@ -181,6 +187,7 @@ def run_evaluator(
     file_replacements: Dict[str, str],
     evaluator_file: str,
     evaluator_timeout_sec: int | None,
+    evaluator_termination_grace_sec: int,
     verbose: bool = False,
     preempt_db: Any | None = None,
     preempt_claim_id: str | None = None,
@@ -197,6 +204,7 @@ def run_evaluator(
         file_replacements=file_replacements,
         cmd=cmd,
         timeout_sec=evaluator_timeout_sec,
+        termination_grace_sec=evaluator_termination_grace_sec,
         preempt_db=preempt_db,
         preempt_claim_id=preempt_claim_id,
     )
