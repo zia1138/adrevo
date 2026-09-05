@@ -184,12 +184,8 @@ class BackendConfig:
 
     Attributes:
         timeout_sec: Optional timeout in seconds for script execution. If None, no timeout is applied
-        data_dirs: Relative paths within the project directory to treat as immutable data.
-            These are excluded from the code zip and staged once per node via symlinks.
-            Example: ("valid_instances",)
     """
     timeout_sec: int = 10 * 60
-    data_dirs: tuple = ()  # relative paths to exclude from code zip, e.g. ("valid_instances",)
 
 
 def validate_backend(cfg: BackendConfig) -> None:
@@ -198,10 +194,6 @@ def validate_backend(cfg: BackendConfig) -> None:
         raise TypeError(f"Expected BackendConfig, got {type(cfg).__name__}")
     if cfg.timeout_sec is not None and not _is_positive_int(cfg.timeout_sec):
         raise ValueError("BackendConfig.timeout_sec must be None or an integer >= 1")
-    if not isinstance(cfg.data_dirs, (tuple, list)):
-        raise ValueError("BackendConfig.data_dirs must be a tuple or list of relative paths")
-    for data_dir in cfg.data_dirs:
-        _validate_relative_path(data_dir, "BackendConfig.data_dirs")
 
 
 def _validate_relative_path(value: str, field_name: str) -> None:

@@ -56,35 +56,6 @@ def zip_dir_to_bytes(
     return buffer.getvalue()
 
 
-def zip_data_dirs_to_bytes(dir_path: str | Path, data_dirs: tuple) -> bytes:
-    """Zip only the specified data directories within a project directory.
-
-    Args:
-        dir_path: Root project directory.
-        data_dirs: Relative directory names to include (e.g. ("valid_instances",)).
-
-    Returns:
-        Zip bytes containing only the data directories with paths relative to dir_path.
-    """
-    dir_path = Path(dir_path)
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for data_dir in data_dirs:
-            data_path = dir_path / data_dir
-            if not data_path.is_dir():
-                logger.warning(f"Data directory not found, skipping: {data_path}")
-                continue
-            for root, dirs, files in os.walk(data_path):
-                dirs[:] = [d for d in dirs if not d.startswith(".")]
-                for file in files:
-                    if file.startswith("."):
-                        continue
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, dir_path)
-                    zf.write(file_path, arcname)
-    return buffer.getvalue()
-
-
 def extract_file_to_string(zip_bytes: bytes, filename: str) -> str:
     """Extracts a single file from an in-memory zip archive as a UTF-8 string."""
     buffer = io.BytesIO(zip_bytes)

@@ -208,12 +208,6 @@ def _validate_initial_project_inputs(
     if not evaluate_path.is_file():
         raise typer.BadParameter(f"Evaluation file not found: {evaluate_path}")
 
-    for data_dir in backend_cfg.data_dirs:
-        data_path = project_dir / data_dir
-        if not data_path.is_dir():
-            raise typer.BadParameter(f"Data directory not found: {data_path}")
-
-
 def _normalize_nonempty(s: str | None) -> str | None:
     if s is None:
         return None

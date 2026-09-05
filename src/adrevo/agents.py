@@ -372,7 +372,6 @@ class AdrevoWorker:
         db: ProgramDatabase,
         model_coordinator: AdrevoModelCoordinator,
         verbose: bool,
-        data_handle=None,
     ):
         super().__init__()
         self.worker_id = worker_id
@@ -386,7 +385,6 @@ class AdrevoWorker:
             config=backend_config,
             evaluator_file=evo_config.evaluate_file,
             verbose=verbose,
-            data_handle=data_handle,
         )
 
         global _logging_configured

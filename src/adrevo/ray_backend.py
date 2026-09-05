@@ -10,11 +10,7 @@ from typing import Tuple, Dict, Any, List
 import ray
 
 from adrevo.config import BackendConfig
-from adrevo.execution import (
-    ExecutionBackend,
-    stage_data_to_node,
-    symlink_data_into_workdir,
-)
+from adrevo.execution import ExecutionBackend
 from adrevo.utils import (
     zip_dir_to_bytes,
     extract_parent_bytes_to_dir,
@@ -113,8 +109,6 @@ def _run_evaluator_task(
     file_replacements: Dict[str, str],
     cmd: List[str],
     timeout_sec: int,
-    data_zip_bytes: bytes | None = None,
-    data_dirs: tuple = (),
     preempt_db: Any | None = None,
     preempt_claim_id: str | None = None,
 ) -> bytes:
@@ -127,13 +121,8 @@ def _run_evaluator_task(
     with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp_dir:
         temp_path = Path(temp_dir)
 
-        # 1. Extract the parent program files (data excluded)
+        # 1. Extract the parent program files.
         extract_parent_bytes_to_dir(parent_zip_bytes, temp_dir)
-
-        # 1b. Stage data on this node (once) and symlink into workdir
-        if data_zip_bytes is not None and data_dirs:
-            cache_dir = stage_data_to_node(data_zip_bytes)
-            symlink_data_into_workdir(cache_dir, data_dirs, temp_dir)
 
         # 2. Apply the candidate file replacements.
         if not isinstance(file_replacements, dict):
@@ -186,8 +175,8 @@ def _run_evaluator_task(
             encoding="utf-8",
         )
 
-        # 5. Zip the entire temp directory and return (excluding data dirs)
-        return zip_dir_to_bytes(temp_dir, exclude_dirs=data_dirs)
+        # 5. Zip the entire temp directory and return.
+        return zip_dir_to_bytes(temp_dir)
 
 class RayExecutionBackend(ExecutionBackend):
     """
@@ -199,18 +188,10 @@ class RayExecutionBackend(ExecutionBackend):
         config: BackendConfig,
         evaluator_file: str,
         verbose: bool = True,
-        data_handle=None,
     ):
         self.config = config
         self.evaluator_file = evaluator_file
         self.verbose = verbose
-        self.data_handle = data_handle  # opaque handle from stage_data() (bytes)
-        self.data_dirs = config.data_dirs
-
-    def stage_data(self, data_zip_bytes: bytes) -> bytes:
-        """Store data bytes for reuse by this backend and worker actors."""
-        self.data_handle = data_zip_bytes
-        return self.data_handle
 
     def _build_command(self) -> List[str]:
         # The evaluator runs from the extracted project directory. Select it
@@ -237,8 +218,6 @@ class RayExecutionBackend(ExecutionBackend):
             file_replacements=file_replacements,
             cmd=cmd,
             timeout_sec=self.config.timeout_sec,
-            data_zip_bytes=self.data_handle,
-            data_dirs=self.data_dirs,
             preempt_db=preempt_db,
             preempt_claim_id=preempt_claim_id,
         )

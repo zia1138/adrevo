@@ -6,7 +6,7 @@ This page is the operational reference. For the quickstart and benchmark results
 
 ## Execution contract
 
-Adrevo starts from the project directory passed to `adrevo run`: it loads `config.py`, reads every file in `AdrevoConfig.evolvable_files`, and keeps the original directory unchanged. For each candidate, it creates a new temporary directory containing a copy of the project files and replaces the allowlisted files returned by the model. It then runs trusted `evaluate.py` in the root project's uv environment—the environment you define with the root `pyproject.toml`. Configured `data_dirs` are made available separately as benchmark input data.
+Adrevo starts from the project directory passed to `adrevo run`: it loads `config.py`, reads every file in `AdrevoConfig.evolvable_files`, and keeps the original directory unchanged. For each candidate, it creates a new temporary directory containing a copy of the project files and replaces the allowlisted files returned by the model. It then runs trusted `evaluate.py` in the root project's uv environment—the environment you define with the root `pyproject.toml`.
 
 `evaluate.py` owns the rest of evaluation: it builds and runs the candidate, validates the candidate's output file, and writes `results.json`. Adrevo reads only that trusted result:
 
@@ -62,7 +62,7 @@ Important settings:
 | Object | Fields |
 |---|---|
 | `AdrevoConfig` | `evolvable_files` (default: `evo/main.py` as Python), models, worker count, generation/cost limits, strategies, and backtracking |
-| `BackendConfig` | evaluator `timeout_sec` and immutable `data_dirs` |
+| `BackendConfig` | evaluator `timeout_sec` |
 
 ### Evolvable files
 
@@ -77,7 +77,7 @@ evolvable_files=(
 )
 ```
 
-`data_dirs` are staged once per worker node and made available in each temporary project directory. They should be treated as benchmark-owned input data.
+The evaluator owns benchmark data: it may use a node-local cache, download data, mount a volume, or connect to external storage. Keep large datasets outside the candidate project so they are not copied into candidate archives.
 
 ## Commands
 

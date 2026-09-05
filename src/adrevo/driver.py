@@ -9,7 +9,7 @@ from adrevo.database import ProgramDatabase, Program
 from adrevo.agents import AdrevoModelCoordinator, AdrevoState, AdrevoWorker
 from adrevo.config import AdrevoConfig, BackendConfig
 from adrevo.ray_backend import RayExecutionBackend
-from adrevo.utils import zip_dir_to_bytes, zip_data_dirs_to_bytes
+from adrevo.utils import zip_dir_to_bytes
 import logfire
 
 # Set up logging
@@ -81,19 +81,6 @@ class AdrevoDriver:
             verbose=verbose,
         )
 
-        # Stage data files via the backend's transport mechanism.
-        if backend_config.data_dirs:
-            data_zip_bytes = zip_data_dirs_to_bytes(self.project_dir, backend_config.data_dirs)
-            self.data_handle = self.backend.stage_data(data_zip_bytes)
-            if self.verbose:
-                logger.info(
-                    f"Data dirs {backend_config.data_dirs} staged "
-                    f"({len(data_zip_bytes) / 1024 / 1024:.1f} MB compressed)"
-                )
-        else:
-            self.data_handle = None
-
-
     def run_ray(self):
         """Ray based evolution."""
         all_refs = []
@@ -131,7 +118,6 @@ class AdrevoDriver:
                             self.db,
                             model_coordinator,
                             self.verbose,
-                            self.data_handle,
                         )
                         all_refs.append(worker.run.remote())
 
@@ -258,8 +244,7 @@ class AdrevoDriver:
             raise ValueError(f"Could not read initial evolvable files: {e}")
 
         # Zip the project directory to use as parent_zip_bytes for generation 0
-        # Data dirs are excluded here; they are staged separately via the object store.
-        parent_zip_bytes = zip_dir_to_bytes(self.project_dir, exclude_dirs=self.backend_config.data_dirs)
+        parent_zip_bytes = zip_dir_to_bytes(self.project_dir)
 
         # Run the evaluation code using the Ray backend.
         results, rtime, result_zip_bytes = self.backend.run_job(
