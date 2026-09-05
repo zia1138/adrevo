@@ -15,6 +15,21 @@ from adrevo.driver import AdrevoDriver
 app = typer.Typer()
 
 
+@app.callback()
+def main() -> None:
+    """Run directed evolution with adrevo."""
+    # Each pair contains highlighted letters followed by dimmed text.
+    parts = (("a", "i "), ("d", "i"), ("r", "ected "), ("evo", "lution"))
+    label = "".join(
+        typer.style(selected, fg=typer.colors.GREEN, bold=True)
+        + typer.style(rest, fg=typer.colors.WHITE, dim=True)
+        for selected, rest in parts
+    )
+    bars = "".join("|" * len(selected) + " " * len(rest) for selected, rest in parts)
+    bars = typer.style(bars.rstrip(), fg=typer.colors.GREEN)
+    typer.echo(f"  {bars}\n  {label}\n  {bars}\n")
+
+
 @dataclass(frozen=True)
 class ProjectRun:
     project_dir: Path
