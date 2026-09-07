@@ -21,6 +21,13 @@ SYSTEM_MSG = textwrap.dedent("""\
       end-to-end runtime of the algorithm.
     - Combined score: combined_score = 0.95 * average_hit_rate + 0.05 * (12 - min(12, runtime)) / 12
 
+    Evaluation contract:
+    - Input cells are strings. Configured column merges have already been applied by the evaluator.
+    - Preserve every input row and its complete multiset of cells, including duplicates and empty strings.
+    - You may reorder rows and cells within rows, but must not modify, add, or remove cell contents.
+    - Write reordered CSV outputs; the evaluator measures total candidate execution time externally.
+    - Runtime includes startup, input loading, reordering, and output writing, averaged across datasets.
+
     Required API (DO NOT CHANGE):
     - You must keep the existing Evolved class structure and the reorder method signature:
       ```python

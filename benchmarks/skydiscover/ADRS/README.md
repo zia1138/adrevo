@@ -27,3 +27,17 @@ adrevo results so far on ADRS
 * prism -  improve a model placement algorithm foravailable GPUs.
 * txn_scheduling - improve a scheduling function to find better schedules for
     transactional workloads made up of read and write operations to data items.
+### LLM-SQL evaluator changes
+
+The evaluator now prepares configured column merges in their declared order,
+reads inputs and outputs as strings (preserving empty strings and values such
+as `001` and `NA`), and checks exact row/cell multiplicities while permitting
+row and within-row cell reordering. Candidate outputs cannot add padding,
+substitute records, or drop data. Prefix reuse is computed sequentially against
+all previously inserted rows, using the existing concatenated-character metric.
+
+Runtime is measured externally around the candidate subprocess and divided by
+the number of datasets. It includes startup, environment resolution, input loading,
+reordering, and output writing; dataset preparation and validation are excluded.
+Candidate-reported runtimes are no longer used. The LLM-SQL result above predates
+these changes and must be rerun, along with baselines, before comparison.

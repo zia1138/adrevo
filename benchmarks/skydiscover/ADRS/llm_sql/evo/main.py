@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import time
 
 import pandas as pd
 from typing import Tuple, List, Dict
@@ -439,11 +438,7 @@ if __name__ == "__main__":
     payload = json.loads(Path("input.json").read_text(encoding="utf-8"))
     output_dir = Path("outputs")
     output_dir.mkdir(exist_ok=True)
-    runtimes = []
     for request in payload["requests"]:
-        dataframe = pd.read_csv(request["input_file"])
-        start = time.perf_counter()
+        dataframe = pd.read_csv(request["input_file"], dtype=str, keep_default_na=False)
         reordered, _ = Evolved().reorder(dataframe, **request["options"])
-        runtimes.append(time.perf_counter() - start)
         reordered.to_csv(output_dir / request["output_file"], index=False)
-    Path("output.json").write_text(json.dumps({"runtimes": runtimes}), encoding="utf-8")
