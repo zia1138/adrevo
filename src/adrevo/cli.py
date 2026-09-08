@@ -25,6 +25,9 @@ def main() -> None:
         + typer.style(rest, fg=typer.colors.WHITE, dim=True)
         for selected, rest in parts
     )
+    label += typer.style(
+        " https://github.com/zia1138/adrevo", fg=typer.colors.BLUE, dim=False
+    )
     bars = "".join("|" * len(selected) + " " * len(rest) for selected, rest in parts)
     bars = typer.style(bars.rstrip(), fg=typer.colors.GREEN)
     typer.echo(f"  {bars}\n  {label}\n  {bars}\n")
