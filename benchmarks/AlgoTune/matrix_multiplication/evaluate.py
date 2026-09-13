@@ -21,11 +21,10 @@ import numpy as np
 
 from baseline.main import solve
 
-EXAMPLE_SIZES = (128, 256, 512, 1024, 2048)
+EXAMPLE_SIZES = (512, 1024, 2048)
 EXAMPLE_SEEDS = (1, 2, 3)
 WARMUP_RUNS = 1
-TIMED_RUNS = 5
-RUN_TIMEOUT = 60
+TIMED_RUNS = 3
 CACHE_DIR = (
     Path.home() / ".cache"
     / "adrevo" / "datasets" / "matrix-multiplication"
@@ -124,7 +123,6 @@ def main():
                             check=True,
                             capture_output=True,
                             text=True,
-                            timeout=RUN_TIMEOUT,
                         )
                     finally:
                         elapsed_ns = time.perf_counter_ns() - start

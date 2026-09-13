@@ -9,6 +9,7 @@ Create this structure:
 ```text
 <task>/
 ├── evaluate.py
+├── evaluate_docker.py
 ├── config_cerebras.py
 ├── pyproject.toml
 ├── baseline/
@@ -27,6 +28,7 @@ Requirements:
 - Cache one NPZ per size under `Path.home() / ".cache" / "adrevo" / "datasets" / "<unique-task-id>"`, with size and seeds in the filename. Reuse the cache; use locking and atomic writes for concurrent workers. No cache versioning or environment-variable override. Clear affected caches when generation or serialization changes.
 - Define a simple task-specific NPZ schema that preserves input/output semantics, including structured or variable-sized data where needed. Use `allow_pickle=False` and avoid object arrays. Document the schema briefly.
 - Each `main.py` reads the absolute input NPZ path from `sys.argv[1]` and writes `output.npz` beside itself. Both programs receive the same cached examples for the size being measured.
+- Create a standalone `evaluate_docker.py` with the same trusted generation, validation, timing, and scoring behavior as `evaluate.py`. It must not import `evaluate.py`. For each baseline and candidate run, create a fresh container from `ghcr.io/astral-sh/uv:python3.13-trixie-slim`, copy in only that program directory and the input NPZ, run `uv run -qq` in the container, and copy out only `output.npz` for trusted validation. Do not use host bind mounts. Time only the attached container execution, not container setup, file copies, or cleanup. Handle `SIGTERM` by stopping the active container with a short grace period and removing it before exiting.
 - Adrevo runs `evaluate.py` with the temporary project root as its working directory. Use simple relative paths for local files; no `ROOT` constant or `__file__` path resolution is needed. Only examples belong in the shared cache; outputs and `results.json` belong in the copied project. Each subprocess runs with its own subfolder as `cwd`, so it can write `output.npz` directly.
 - At each size, run one warmup per program, then five measured runs each (configurable constants), alternating baseline/candidate order. Time the entire `uv run -qq python main.py <input_path>` subprocess with `time.perf_counter_ns()`, its subfolder as `cwd`, and a timeout. Discard warmup timings; use the median batch runtime for each program at that size. Time sizes separately; do not combine all sizes into a single subprocess. Report `baseline_time` and `evo_time` in seconds and retain raw nanosecond samples. Include startup and I/O; exclude generation and trusted validation. Record measured elapsed times even on execution failure.
 - Remove stale output before every run, including warmups, then load its output and validate every example with `is_solution`. Reject missing, malformed, or incorrect output.

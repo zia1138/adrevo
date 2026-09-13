@@ -40,6 +40,18 @@ Example output:
 Category: matrix_operations"""
 
 
+# Sample one focus per parent run; leave 10% for unconstrained exploration.
+strategies = (
+    "Explore Strassen-style recursion to reduce block multiplications.",
+    "Explore recursive splitting rules adapted to matrix shape, including unequal splits.",
+    "Adapt recursion stopping and algorithm selection to subproblem shape and cost.",
+    "Explore recursive blocking and workspace reuse to reduce memory traffic and allocations.",
+    "Jointly evolve splitting, multiplication schemes, and stopping rules to exploit their interactions.",
+)
+pr_no_strategy = 0.10
+pr_strategies = (0.25, 0.20, 0.15, 0.15, 0.15)
+
+
 def build_evo_models() -> list[ModelSpec]:
     cerebras_provider = CerebrasProvider()
     gpt_oss_120b_medium = ModelSpec(
@@ -73,7 +85,11 @@ def get_adrevo_config() -> AdrevoConfig:
         num_agent_workers=5,
         task_sys_msg=SYSTEM_MSG,
         build_evo_models=build_evo_models,
+        strategies=strategies,
+        pr_no_strategy=pr_no_strategy,
+        pr_strategies=pr_strategies,
         model_wait_poll_sec=2.0,
         max_cost=5.0,
         evaluator_timeout_sec=780,  # 12 runs × 60 seconds, plus evaluation overhead
+        evaluate_file="evaluate_docker.py",
     )
