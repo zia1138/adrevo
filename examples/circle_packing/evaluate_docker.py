@@ -10,6 +10,8 @@ import numpy as np
 
 RUNNER_IMAGE = "ghcr.io/astral-sh/uv:python3.13-trixie-slim"
 CONTAINER_TERMINATION_GRACE_SEC = 10
+N = 26
+OUTPUT_FILE = Path("evo/circle_packing.json")
 
 
 class EvaluatorTerminated(SystemExit):
@@ -20,10 +22,39 @@ def _handle_sigterm(_signum, _frame) -> None:
     raise EvaluatorTerminated(143)
 
 
+def validate_packing(centers, radii, atol=1e-10):
+    if not isinstance(centers, np.ndarray):
+        centers = np.array(centers)
+    if not isinstance(radii, np.ndarray):
+        radii = np.array(radii)
+
+    if centers.shape != (N, 2):
+        return False, f"Centers shape incorrect. Expected ({N}, 2), got {centers.shape}"
+    if radii.shape != (N,):
+        return False, f"Radii shape incorrect. Expected ({N},), got {radii.shape}"
+    if np.any(np.isnan(centers)) or np.any(np.isnan(radii)):
+        return False, "NaN values in output"
+    if np.any(radii < 0):
+        return False, f"Negative radii found at indices: {np.where(radii < 0)[0]}"
+
+    for i in range(N):
+        x, y = centers[i]
+        r = radii[i]
+        if x - r < -atol or x + r > 1 + atol or y - r < -atol or y + r > 1 + atol:
+            return False, f"Circle {i} (x={x:.4f}, y={y:.4f}, r={r:.4f}) outside unit square."
+    for i in range(N):
+        for j in range(i + 1, N):
+            dist = np.sqrt(np.sum((centers[i] - centers[j]) ** 2))
+            if dist < radii[i] + radii[j] - atol:
+                return False, (
+                    f"Circles {i} & {j} overlap. Dist: {dist:.4f}, "
+                    f"Sum Radii: {(radii[i] + radii[j]):.4f}"
+                )
+    return True, None
+
+
 def run_candidate() -> str:
     """Run the candidate in a fresh Docker container."""
-    from evaluate import OUTPUT_FILE
-
     container = None
     OUTPUT_FILE.unlink(missing_ok=True)
     previous_sigterm_handler = signal.signal(signal.SIGTERM, _handle_sigterm)
@@ -72,9 +103,6 @@ def run_candidate() -> str:
 
 
 def main() -> None:
-    # This import stays in the trusted evaluator, outside the container.
-    from evaluate import validate_packing
-
     try:
         output_text = run_candidate()
         payload = json.loads(output_text)

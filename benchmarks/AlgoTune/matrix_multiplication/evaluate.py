@@ -25,10 +25,8 @@ EXAMPLE_SIZES = (512, 1024, 2048)
 EXAMPLE_SEEDS = (1, 2, 3)
 WARMUP_RUNS = 1
 TIMED_RUNS = 3
-CACHE_DIR = (
-    Path.home() / ".cache"
-    / "adrevo" / "datasets" / "matrix-multiplication"
-)
+PROGRAMS = ("baseline", "evo")
+CACHE_DIR = Path.home() / ".cache" / "adrevo" / "datasets" / "matrix-multiplication"
 
 
 def generate_problem(n: int, random_seed: int = 1):
@@ -59,23 +57,18 @@ def ensure_examples(n):
     return path
 
 
-def is_solution(problem, solution) -> bool:
-    """Validate the candidate output against the trusted product."""
-    expected = solve(problem)
-    solution = np.asarray(solution)
-    return bool(
-        solution.shape == expected.shape
-        and np.isfinite(solution).all()
-        and np.allclose(solution, expected, rtol=1e-5, atol=1e-8)
-    )
-
-
 def validate_output(path, problems):
     with np.load(path, allow_pickle=False) as output:
         if set(output.files) != {f"C_{i}" for i in range(len(problems))}:
             raise ValueError(f"{path.parent.name}: missing or unexpected output keys")
         for i, problem in enumerate(problems):
-            if not is_solution(problem, output[f"C_{i}"]):
+            expected = solve(problem)
+            solution = np.asarray(output[f"C_{i}"])
+            if not (
+                solution.shape == expected.shape
+                and np.isfinite(solution).all()
+                and np.allclose(solution, expected, rtol=1e-5, atol=1e-8)
+            ):
                 raise ValueError(f"{path.parent.name}: incorrect solution for example {i}")
 
 
@@ -110,8 +103,8 @@ def main():
             }
             result["per_size"].append(measurement)
             for run in range(WARMUP_RUNS + TIMED_RUNS):
-                # Alternate order across repetitions and sizes.
-                names = ("baseline", "evo") if (run + size_index) % 2 == 0 else ("evo", "baseline")
+                # Both programs solve identical inputs; alternating order limits drift.
+                names = PROGRAMS if (run + size_index) % 2 == 0 else PROGRAMS[::-1]
                 for name in names:
                     output_path = Path(name) / "output.npz"
                     output_path.unlink(missing_ok=True)
@@ -129,13 +122,14 @@ def main():
                         if run >= WARMUP_RUNS:
                             measurement[f"{name}_times_ns"].append(elapsed_ns)
                     validate_output(output_path, problems)
-            for name in ("baseline", "evo"):
+            for name in PROGRAMS:
                 measurement[f"{name}_time"] = statistics.median(measurement[f"{name}_times_ns"]) / 1e9
-        for name in ("baseline", "evo"):
+        for name in PROGRAMS:
             result[f"{name}_alpha"] = fit_scaling(
                 EXAMPLE_SIZES, [row[f"{name}_time"] for row in result["per_size"]]
             )
-        # Keep the sign: negative is valid but indicates worse empirical scaling.
+        # Lower log-log slope means runtime grows more slowly as matrices grow.
+        # A positive score therefore means evo scales better than the baseline.
         result["combined_score"] = result["baseline_alpha"] - result["evo_alpha"]
         result["correct"] = True
     except subprocess.CalledProcessError as exc:
