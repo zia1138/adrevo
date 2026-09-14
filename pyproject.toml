@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "adrevo is an experimental system for agentic, AI-driven directed evolution of algorithms"
 readme = "README.md"
 authors = [
-    { name = "Zia Khan", email = "zia1138@gmail.com" }
+    { name = "Zia Khan", email = "10147518+zia1138@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
 dependencies = [
