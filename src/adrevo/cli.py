@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import contextlib
 import concurrent.futures
+import shutil
 import typer
 import runpy
 from dataclasses import dataclass
@@ -337,6 +338,116 @@ def _run_single_project(
         resume_from=project_run.results_dir if resume else None,
     )
     adrevo_driver.run_ray()
+
+
+@app.command()
+def harbor(
+    project_dir: str = typer.Argument(..., help="Adrevo project to package for Harbor."),
+    output: Path = typer.Option(..., help="New output directory outside the source project."),
+    config: str | None = typer.Option(
+        None, help="Config supplying the Harbor task_sys_msg.",
+    ),
+    evaluate: str = typer.Option(
+        "evaluate.py", help="Project-relative subprocess evaluator.",
+    ),
+    agent_timeout_sec: int = typer.Option(3600, min=1, help="Harbor agent time limit."),
+    non_interactive: bool = typer.Option(
+        False, help="Require --config if multiple configs exist.",
+    ),
+):
+    """Export the local subprocess evaluator and candidate as a Harbor task."""
+    project = _validate_project_dir(project_dir).resolve()
+    config_file = _resolve_project_config(project, config, non_interactive)
+    cfg = _load_project_config(config_file, project)
+    task_sys_msg = cfg.task_sys_msg.rstrip()
+    destination = output.resolve()
+    if destination.is_relative_to(project):
+        raise typer.BadParameter("Output directory must be outside the source project.")
+    if output.is_symlink() or destination.exists():
+        raise typer.BadParameter(f"Output already exists: {output}")
+
+    evaluate_path = Path(evaluate)
+    if evaluate_path.is_absolute() or ".." in evaluate_path.parts:
+        raise typer.BadParameter("Evaluate must be a project-relative path without '..'.")
+    required = (evaluate_path, Path("pyproject.toml"))
+    missing = [path for path in required if not (project / path).is_file()]
+    if not (project / "evo").is_dir():
+        missing.append(Path("evo"))
+    if missing:
+        raise typer.BadParameter(
+            "Required files missing: " + ", ".join(sorted(map(str, missing)))
+        )
+    task_config = (
+        'schema_version = "1.3"\n\n'
+        'artifacts = [\n'
+        '    { source = "/app/evo", destination = "evo" },\n'
+        f"]\n\n[agent]\ntimeout_sec = {agent_timeout_sec}\n"
+    )
+    development_instructions = (
+        "Work in `/app` and improve the solution in `evo/`. First inspect the evaluator "
+        "to understand the requirements, constraints, and scoring. Preserve the solution's "
+        "input/output contract, keep `correct` true, and maximize `combined_score`.\n\n"
+        "Iterate on the solution: make an improvement, run the evaluator, inspect the result, "
+        "and use what you learn for the next improvement. Continue until you believe you have "
+        "achieved a good solution and further changes are unlikely to help.\n\n"
+        "Run the evaluator with:\n\n```bash\ncd /app\n"
+        f"rm -f results.json\nuv run -qq --project . python {evaluate_path.as_posix()}\n"
+        "cat results.json\n```\n\n"
+        "A failed evaluation is not a valid result. Keep all final solution changes inside "
+        "`evo/`, and declare any solution dependencies in `evo/pyproject.toml`. Do not rely "
+        "on changes to the evaluator or baseline.\n"
+    )
+    instructions = (
+        f"{task_sys_msg}\n\n## Working instructions\n\n"
+        f"{development_instructions}"
+        if task_sys_msg
+        else development_instructions
+    )
+    dockerfile = """FROM ghcr.io/astral-sh/uv:python3.13-trixie-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    bash coreutils git tmux procps ca-certificates \\
+    && rm -rf /var/lib/apt/lists/*
+ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+WORKDIR /app
+COPY project/ /app/
+RUN uv sync --no-install-project
+"""
+    try:
+        destination.mkdir(parents=True, exist_ok=False)
+        environment = destination / "environment"
+        snapshot = environment / "project"
+        shutil.copytree(
+            project,
+            snapshot,
+            ignore=shutil.ignore_patterns(
+                ".*",
+                "config.py",
+                "config_*.py",
+                "evaluate_*.py",
+                "__pycache__",
+                ".venv",
+                "venv",
+                "env",
+                "results_*",
+                "results.json",
+                "*.pyc",
+                "*.pyo",
+            ),
+        )
+        evaluator_target = snapshot / evaluate_path
+        evaluator_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(project / evaluate_path, evaluator_target)
+        (destination / "instruction.md").write_text(instructions, encoding="utf-8")
+        (destination / "task.toml").write_text(task_config, encoding="utf-8")
+        (environment / "Dockerfile").write_text(dockerfile, encoding="utf-8")
+    except OSError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Created Harbor task: {destination}")
+    quoted_destination = "'" + str(destination).replace("'", "'\"'\"'") + "'"
+    typer.echo(
+        f"harbor run -p {quoted_destination} -a terminus-2 -m MODEL --disable-verification"
+    )
+    typer.echo("Candidate files will be collected under each trial's artifacts/ directory.")
 
 
 @app.command()

@@ -84,6 +84,7 @@ The evaluator owns benchmark data: it may use a node-local cache, download data,
 | `adrevo run PROJECT` | Start one project | `--config`, `--results-dir`, `--verbose`, `--ray-address` |
 | `adrevo resume PROJECT` | Continue a checkpointed project | required `--results-dir`; optional `--config` |
 | `adrevo run-folder PROJECT...` | Run several projects | `--config`, `--results-dir`, `--max-concurrent` |
+| `adrevo harbor PROJECT` | Export a Harbor development task | required `--output`; optional `--config`, `--evaluate`, `--agent-timeout-sec` |
 
 For example:
 
@@ -92,6 +93,55 @@ uv run adrevo run examples/circle_packing --config config_openai.py
 ```
 
 Use `adrevo COMMAND --help` for the complete option list.
+
+## Export a project to Harbor
+
+Create a minimal [Harbor](https://docs.harborframework.com/) task without changing
+the Adrevo project:
+
+```bash
+uv run adrevo harbor examples/circle_packing \
+  --output .cache/harbor/circle-packing
+
+harbor run -p .cache/harbor/circle-packing \
+  -a terminus-2 -m MODEL --disable-verification
+```
+
+The output contains `instruction.md`, `task.toml`, and an `environment/` directory
+with a Dockerfile and a filtered project copy. Project subdirectories are retained,
+including `evo/`, `baseline/`, datasets, and evaluator utilities. Adrevo config
+files, unselected `evaluate_*.py` variants, virtual environments, caches, secrets,
+and prior results are not copied. The selected evaluator is always included. The
+selected config is loaded and validated through the same path as `adrevo run`, and
+its `task_sys_msg` becomes the Harbor instruction.
+When several configs exist, the exporter prompts for one using the same selection
+flow as `adrevo run`. Use `--config` to select one directly, or
+`--non-interactive` to require an explicit selection. Export does not start Ray,
+build containers, or run Harbor. The output must be a new directory outside the
+source project, and the source is unchanged.
+
+The generated image provides Python 3.13 and uv, and the agent can run the
+subprocess evaluator repeatedly for feedback. It defaults to `evaluate.py`; use
+`--evaluate` to select another project-relative file:
+
+```bash
+uv run adrevo harbor benchmarks/AlgoTune/matrix_multiplication \
+  --output .cache/harbor/matrix-multiplication
+```
+
+`--agent-timeout-sec` controls Harbor's agent time limit (default: 3,600 seconds);
+it does not translate Adrevo's model-spending budget.
+
+Harbor collects the complete `evo/` candidate directory automatically, even with
+verification disabled. It appears at:
+
+```text
+<job>/<trial>/artifacts/evo/
+```
+
+To grade externally, place those files into a clean copy of the original project
+and use its authoritative evaluator. The converter does not generate a verifier
+or automate grading.
 
 ## Operations
 
