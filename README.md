@@ -58,7 +58,9 @@ The evaluator must write:
 {"correct": true, "error": null, "combined_score": 1.23}
 ```
 
-`correct` is a boolean, `error` is a string or `null`, and larger `combined_score` values are better. Adrevo never edits `evaluate.py`.
+`correct` is a boolean and `error` is a string or `null`. Larger `combined_score`
+values are better by default; set `maximize_combined_score=False` in
+`AdrevoConfig` when lower values are better. Adrevo never edits `evaluate.py`.
 
 Create the project like this:
 
@@ -101,7 +103,8 @@ Start from the [circle-packing example](examples/circle_packing), especially its
 2. A new global best becomes the committed search lineage. A local improvement can be explored as a side branch without replacing that lineage.
 3. If the final model in the configured model list cannot improve the current branch, adrevo backtracks one or more ancestors (`backtrack_steps`) and continues from there.
 
-The evaluator must treat larger `combined_score` values as better. See [the configuration dataclasses](src/adrevo/config.py) for all settings.
+The evaluator may use either score direction; configure `maximize_combined_score`
+accordingly. See [the configuration dataclasses](src/adrevo/config.py) for all settings.
 
 ## Benchmarks
 

@@ -383,16 +383,19 @@ def harbor(
         '    { source = "/app/evo", destination = "evo" },\n'
         f"]\n\n[agent]\ntimeout_sec = {agent_timeout_sec}\n"
     )
+    score_goal = "maximize" if cfg.maximize_combined_score else "minimize"
+    score_comparison = "higher" if cfg.maximize_combined_score else "lower"
+    score_superlative = "highest" if cfg.maximize_combined_score else "lowest"
     development_instructions = (
         "Work in `/app` and improve the solution in `evo/`. First inspect the evaluator "
         "to understand the requirements, constraints, and scoring. Preserve the solution's "
-        "input/output contract, keep `correct` true, and maximize `combined_score`.\n\n"
+        f"input/output contract, keep `correct` true, and {score_goal} `combined_score`.\n\n"
         "Iterate on the solution: make an improvement, run the evaluator, inspect the result, "
         "and use what you learn for the next improvement. Continue until you believe you have "
         "achieved a good solution and further changes are unlikely to help.\n\n"
-        "Keep your best verified, highest-scoring valid solution in `/app/evo/main.py`. "
+        f"Keep your best verified, {score_superlative}-scoring valid solution in `/app/evo/main.py`. "
         "Try experimental changes in separate working copies, and replace the stored best "
-        "solution only after evaluation confirms a higher `combined_score` with `correct` true. "
+        f"solution only after evaluation confirms a {score_comparison} `combined_score` with `correct` true. "
         "Keep its supporting files and dependencies in `evo/` consistent with that solution. "
         "The `evo/` directory is collected when execution ends, including on timeout, so it "
         "must contain your best solution rather than your latest unverified experiment.\n\n"

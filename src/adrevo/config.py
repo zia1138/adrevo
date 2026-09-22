@@ -69,6 +69,8 @@ class AdrevoConfig:
         pr_strategies: Tuple of probabilities for each strategy in strategies.
         max_cost: Maximum token cost allowed for evolution.
         backtrack_steps: Number of ancestors to move upward on max-rank failure.
+        maximize_combined_score: Whether higher combined scores are better. Set
+            to False to minimize combined_score instead.
     """
     build_evo_models: Callable[[], list[ModelSpec]]
     task_sys_msg: str =  ""
@@ -90,21 +92,18 @@ class AdrevoConfig:
     pr_strategies: tuple = ()
     max_cost: float = float('inf')  # limit token cost in evolution
     backtrack_steps: int = 1
+    maximize_combined_score: bool = True
+
+    def is_better_score(self, score: float, reference: float) -> bool:
+        """Return whether ``score`` improves on ``reference``."""
+        if self.maximize_combined_score:
+            return score > reference
+        return score < reference
 
     @property
-    def evo_file(self) -> str:
-        """Legacy singular-file view of the first evolvable file.
-
-        New code should use :attr:`evolvable_files`; this property keeps older
-        single-file workers and integrations working while configurations may
-        declare more than one evolvable file.
-        """
-        return self.evolvable_files[0].file
-
-    @property
-    def lang_identifier(self) -> str:
-        """Legacy language identifier paired with :attr:`evo_file`."""
-        return self.evolvable_files[0].lang_identifier
+    def worst_score(self) -> float:
+        """Return the score sentinel that no valid score can improve on."""
+        return -float("inf") if self.maximize_combined_score else float("inf")
 
 def validate_adrevo(cfg: AdrevoConfig) -> None:
     """Validate the AdrevoConfig object."""
@@ -121,6 +120,8 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
         raise ValueError("AdrevoConfig.max_generations must be an integer >= 1")
     if not _is_positive_int(cfg.backtrack_steps):
         raise ValueError("AdrevoConfig.backtrack_steps must be an integer >= 1")
+    if not isinstance(cfg.maximize_combined_score, bool):
+        raise ValueError("AdrevoConfig.maximize_combined_score must be a boolean")
     if not isinstance(cfg.use_probe, bool):
         raise ValueError("AdrevoConfig.use_probe must be a boolean")
     if not isinstance(cfg.evolvable_files, tuple) or not cfg.evolvable_files:

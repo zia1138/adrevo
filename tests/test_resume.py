@@ -15,6 +15,7 @@ def make_config(
     model_id: str = "test-model",
     input_token_cost: float = 1.25,
     output_token_cost: float = 2.5,
+    maximize_combined_score: bool = True,
 ) -> AdrevoConfig:
     return AdrevoConfig(
         build_evo_models=lambda: [
@@ -25,11 +26,51 @@ def make_config(
                 input_token_cost=input_token_cost,
                 output_token_cost=output_token_cost,
             )
-        ]
+        ],
+        maximize_combined_score=maximize_combined_score,
     )
 
 
 class ResumeStateTests(unittest.TestCase):
+    def test_database_can_minimize_combined_score(self):
+        database_class = ProgramDatabase.__ray_metadata__.modified_class
+        database = database_class(make_config(maximize_combined_score=False))
+        try:
+            initial = Program(
+                id="initial",
+                files={"evo/main.py": "print('initial')"},
+                model_id="initial",
+                correct=True,
+                combined_score=10.0,
+            )
+            lower_child = Program(
+                id="lower",
+                files={"evo/main.py": "print('lower')"},
+                model_id="test-model",
+                parent_id=initial.id,
+                correct=True,
+                combined_score=5.0,
+            )
+            higher_child = Program(
+                id="higher",
+                files={"evo/main.py": "print('higher')"},
+                model_id="test-model",
+                parent_id=lower_child.id,
+                correct=True,
+                combined_score=7.0,
+            )
+
+            database.add_initial(initial, b"initial-zip")
+            database.add(lower_child, b"lower-zip")
+            database.add(higher_child, b"higher-zip")
+
+            best_program, best_score = database.get_best_program_and_score()
+            self.assertEqual(best_program.id, "lower")
+            self.assertEqual(best_score, 5.0)
+            self.assertEqual(database.search_focus_id, "lower")
+        finally:
+            database.close()
+
     def test_database_checkpoint_round_trip(self):
         database_class = ProgramDatabase.__ray_metadata__.modified_class
         database = database_class(make_config())

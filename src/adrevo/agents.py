@@ -869,7 +869,7 @@ class AdrevoWorker:
                     compute_time=runtime_sec,
                 )
 
-                if combined > context.parent_score:
+                if self.evo_config.is_better_score(combined, context.parent_score):
                     fdback.append(
                         "This is an improvement over the parent score of "
                         f"{context.parent_score}."
@@ -1046,8 +1046,11 @@ class AdrevoWorker:
             ).rstrip()
             for spec in self.evo_config.evolvable_files
         )
+        score_direction = (
+            "higher" if self.evo_config.maximize_combined_score else "lower"
+        )
         prompt = textwrap.dedent("""
-            Improve one or more source code files to achieve a higher `combined_score` than the parent program.
+            Improve one or more source code files to achieve a {score_direction} `combined_score` than the parent program.
             The parent program score is {score}.
             Improve the current algorithm, replace it with a new algorithm, or install and use new dependencies.
 
@@ -1066,6 +1069,7 @@ class AdrevoWorker:
             You have at most {max_model_turns} model turns total, including this one.
             Learn from feedback and revise accordingly.
         """).format(
+            score_direction=score_direction,
             score=context.parent.combined_score,
             parent_files=parent_files,
             max_model_turns=max_model_turns,

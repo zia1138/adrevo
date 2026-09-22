@@ -312,7 +312,9 @@ class ProgramDatabase:
             parent_improved = (
                 parent.combined_score is not None
                 and program.combined_score is not None
-                and program.combined_score > parent.combined_score
+                and self.evo_config.is_better_score(
+                    program.combined_score, parent.combined_score
+                )
             )
 
         # Store the program and its project state before publishing any search
@@ -327,10 +329,12 @@ class ProgramDatabase:
             current_global_score = (
                 current_global_best.combined_score
                 if current_global_best is not None and current_global_best.combined_score is not None
-                else -float('inf')
+                else self.evo_config.worst_score
             )
 
-            if program.combined_score > current_global_score:
+            if self.evo_config.is_better_score(
+                program.combined_score, current_global_score
+            ):
                 # New global best: commit this lineage. Workers focus here, and
                 # future backtracking starts from here.
                 self.global_best_id = program.id
@@ -353,10 +357,12 @@ class ProgramDatabase:
                 current_branch_score = (
                     current_branch_best.combined_score
                     if current_branch_best is not None and current_branch_best.combined_score is not None
-                    else -float('inf')
+                    else self.evo_config.worst_score
                 )
 
-                if program.combined_score > current_branch_score:
+                if self.evo_config.is_better_score(
+                    program.combined_score, current_branch_score
+                ):
                     # New branch best: workers focus here, but the committed
                     # lineage and backtracking cursor stay unchanged.
                     previous_focus_id = self.search_focus_id
@@ -543,21 +549,21 @@ class ProgramDatabase:
     def get_best_program_and_score(self) -> tuple[Optional[Program], float]:
         """Return the current best correct program and its score."""
         if self.global_best_id is None:
-            return None, -float('inf')
+            return None, self.evo_config.worst_score
 
         best_program = self.programs.get(self.global_best_id)
         if best_program is None or best_program.combined_score is None:
-            return None, -float('inf')
+            return None, self.evo_config.worst_score
 
         return best_program, best_program.combined_score
 
     def get_best_score(self):
         if self.global_best_id is None:
-            return -float('inf')
+            return self.evo_config.worst_score
 
         best_program = self.programs.get(self.global_best_id)
         if best_program is None or best_program.combined_score is None:
-            return -float('inf')
+            return self.evo_config.worst_score
 
         return best_program.combined_score
 
