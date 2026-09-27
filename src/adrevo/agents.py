@@ -1047,8 +1047,8 @@ class AdrevoWorker:
         )
         if fixed_files:
             fixed_files = (
-                "The following fixed files are relevant to the candidate files "
-                "and provided as read-only context. They cannot be modified; "
+                "The following fixed files are relevant to the candidate files and evaluator "
+                "They are provided as read-only context. They cannot be modified; "
                 "only the configured candidate files may be replaced.\n\n"
                 + fixed_files
             )
