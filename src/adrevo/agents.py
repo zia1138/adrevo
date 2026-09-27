@@ -74,8 +74,6 @@ class ParentRunContext:
     claim_id: str
     parent: Program
     parent_zip_bytes: bytes
-    # Evaluation file contents included in the initial model prompt.
-    eval_code: str
     # Project zip used for evaluation.
     current_zip_bytes: bytes
     # Cached parent score and start time used for feedback and DB metadata.
@@ -526,10 +524,6 @@ class AdrevoWorker:
 
         parent_zip_bytes: bytes = ray.get(self.db.get_zip_bytes.remote(parent.id))
         strategy = self._select_strategy(current_gen)
-        eval_code = extract_file_to_string(
-            parent_zip_bytes,
-            self.evo_config.evaluate_file,
-        )
 
         return ParentRunContext(
             current_gen=current_gen,
@@ -537,7 +531,6 @@ class AdrevoWorker:
             claim_id=claim["claim_id"],
             parent=parent,
             parent_zip_bytes=parent_zip_bytes,
-            eval_code=eval_code,
             current_zip_bytes=parent_zip_bytes,
             parent_score=parent.combined_score,
             inference_start=time.time(),
@@ -1046,6 +1039,19 @@ class AdrevoWorker:
             ).rstrip()
             for spec in self.evo_config.evolvable_files
         )
+        fixed_files = "\n\n".join(
+            f"### {spec.file} (read-only)\n"
+            f"```{spec.lang_identifier}\n"
+            f"{extract_file_to_string(context.parent_zip_bytes, spec.file)}\n```"
+            for spec in self.evo_config.fixed_files
+        )
+        if fixed_files:
+            fixed_files = (
+                "The following fixed files are relevant to the candidate files "
+                "and provided as read-only context. They cannot be modified; "
+                "only the configured candidate files may be replaced.\n\n"
+                + fixed_files
+            )
         score_direction = (
             "higher" if self.evo_config.maximize_combined_score else "lower"
         )
@@ -1065,6 +1071,8 @@ class AdrevoWorker:
             {eval_code}
             ```
 
+            {fixed_files}
+
             Preserve the existing input, output, and entrypoint behavior.
             You have at most {max_model_turns} model turns total, including this one.
             Learn from feedback and revise accordingly.
@@ -1074,7 +1082,10 @@ class AdrevoWorker:
             parent_files=parent_files,
             max_model_turns=max_model_turns,
             evaluate_file=self.evo_config.evaluate_file,
-            eval_code=context.eval_code,
+            eval_code=extract_file_to_string(
+                context.parent_zip_bytes, self.evo_config.evaluate_file
+            ),
+            fixed_files=fixed_files,
         ).strip()
         return self._format_code_update_prompt(context, prompt)
 

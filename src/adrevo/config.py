@@ -30,8 +30,8 @@ class ModelSpec:
 
 
 @dataclass(frozen=True)
-class EvolvableFile:
-    """A candidate-owned file that Adrevo may replace.
+class AdrevoFile:
+    """A project file included as evolvable code or fixed prompt context.
 
     Attributes:
         file: Project-relative path to the file.
@@ -41,6 +41,10 @@ class EvolvableFile:
 
     file: str
     lang_identifier: str
+
+
+# Backward compatibility for existing project configurations.
+EvolvableFile = AdrevoFile
 
 
 @dataclass(frozen=True)
@@ -55,6 +59,8 @@ class AdrevoConfig:
         max_generations: Maximum number of program generations to evolve.
         evolvable_files: Candidate-owned files Adrevo may edit. Each file has
             its own language identifier for LLM code blocks.
+        fixed_files: Project files relevant to the candidate files, shown in the
+            initial model prompt as read-only context. They cannot be modified.
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
         evaluator_timeout_sec: Maximum seconds for trusted evaluate.py to run.
             Set to None to disable the timeout.
@@ -76,9 +82,9 @@ class AdrevoConfig:
     task_sys_msg: str =  ""
     num_agent_workers: int = 4
     max_generations: int = 500
-    evolvable_files: tuple[EvolvableFile, ...] = (
-        EvolvableFile(file="evo/main.py", lang_identifier="python"),
-        EvolvableFile(file="evo/pyproject.toml", lang_identifier="toml")
+    evolvable_files: tuple[AdrevoFile, ...] = (
+        AdrevoFile(file="evo/main.py", lang_identifier="python"),
+        AdrevoFile(file="evo/pyproject.toml", lang_identifier="toml")
     )
     evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
     evaluator_timeout_sec: int | None = 10 * 60
@@ -93,6 +99,7 @@ class AdrevoConfig:
     max_cost: float = float('inf')  # limit token cost in evolution
     backtrack_steps: int = 1
     maximize_combined_score: bool = True
+    fixed_files: tuple[AdrevoFile, ...] = ()
 
     def is_better_score(self, score: float, reference: float) -> bool:
         """Return whether ``score`` improves on ``reference``."""
@@ -129,8 +136,8 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
     seen_evolvable_files: set[str] = set()
     for index, evolvable_file in enumerate(cfg.evolvable_files):
         field_name = f"AdrevoConfig.evolvable_files[{index}]"
-        if not isinstance(evolvable_file, EvolvableFile):
-            raise ValueError(f"{field_name} must be an EvolvableFile")
+        if not isinstance(evolvable_file, AdrevoFile):
+            raise ValueError(f"{field_name} must be an AdrevoFile")
         _validate_relative_path(evolvable_file.file, f"{field_name}.file")
         if Path(evolvable_file.file).parts[0] != "evo":
             raise ValueError(f"{field_name}.file must be inside evo/: {evolvable_file.file}")
@@ -142,6 +149,22 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
         if evolvable_file.file in seen_evolvable_files:
             raise ValueError(f"Duplicate evolvable file: {evolvable_file.file}")
         seen_evolvable_files.add(evolvable_file.file)
+    if not isinstance(cfg.fixed_files, tuple):
+        raise ValueError("AdrevoConfig.fixed_files must be a tuple")
+    seen_fixed_files: set[Path] = set()
+    for index, fixed_file in enumerate(cfg.fixed_files):
+        field_name = f"AdrevoConfig.fixed_files[{index}]"
+        if not isinstance(fixed_file, AdrevoFile):
+            raise ValueError(f"{field_name} must be an AdrevoFile")
+        _validate_relative_path(fixed_file.file, f"{field_name}.file")
+        if not isinstance(fixed_file.lang_identifier, str) or not fixed_file.lang_identifier.strip():
+            raise ValueError(f"{field_name}.lang_identifier must be a non-empty string")
+        path = Path(fixed_file.file)
+        if path in seen_fixed_files:
+            raise ValueError(f"Duplicate fixed file: {fixed_file.file}")
+        if path in {Path(file) for file in seen_evolvable_files}:
+            raise ValueError(f"File cannot be both fixed and evolvable: {fixed_file.file}")
+        seen_fixed_files.add(path)
     _validate_relative_path(cfg.evaluate_file, "AdrevoConfig.evaluate_file")
     if (
         cfg.evaluator_timeout_sec is not None
