@@ -1,12 +1,23 @@
 # adrevo <a href="https://zia1138.github.io/adrevo"><img src="docs/adrevo.png" align="right" alt="adrevo" /></a>
 
-**adrevo evolves algorithms with AI.** It asks language models for complete program improvements, evaluates each candidate against your test, and keeps the ones that score better.
+**adrevo helps you plan and build research environments and evolve better algorithms with AI.** Inspired by systems like [ScientistTwo](https://arxiv.org/abs/2609.19644), it turns related work, existing code, and a research objective into a plan for fair comparisons and a trusted evaluator. That environment becomes the basis for discovery: language models propose algorithm improvements, the evaluator tests them, and adrevo keeps the candidates that score better.
 
-Inspired by AlphaEvolve-style program evolution, adrevo adds **adaptive backtracking**: it explores locally improving branches, but when every configured model fails to improve a branch, it walks back up the last globally improving lineage and tries a different direction.
+Inspired by [AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/), adrevo adds **adaptive backtracking** to program evolution: it explores locally improving branches, but when every configured model fails to improve a branch, it walks back up the last globally improving lineage and tries a different direction.
 
 > Experimental software for research and algorithm development.
 
-## Run an example
+## Plan and build an evaluation environment
+
+Start with a project containing code/data and `BACKGROUND.md` describing related work. `plan` uses the Codex CLI to write, critique, and refine versioned research plans (up to three refinements by default).
+
+```bash
+uv run adrevo plan my-project plans
+uv run adrevo build plans build-workspace
+```
+
+`build` lets you select a plan, copies it with `BACKGROUND.md` into a new workspace, and writes `BUILD.md` with instructions for creating the evaluator and comparison implementations.
+
+## Run example evolution
 
 Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/), a [Cerebras](https://www.cerebras.ai) API key, an [OpenAI](https://platform.openai.com) API key, and a [Logfire](https://logfire.pydantic.dev/login) account. Create a Logfire project named `adrevo` before continuing.
 
@@ -140,12 +151,6 @@ adrevo beats SOTA on 3/5 mathematical-optimization benchmarks.
 
 adrevo beats SOTA on 3/5 ADRS benchmarks.
 
-## Related work
+## Related Work
 
-### Search-based
-
-[AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/), [ShinkaEvolve](https://github.com/SakanaAI/ShinkaEvolve), [OpenEvolve](https://github.com/algorithmicsuperintelligence/openevolve), [LLM4AD](https://github.com/Optima-CityU/llm4ad), [skydiscover / AdaEvolve](https://github.com/skydiscover-ai/skydiscover), [GigaEvo](https://github.com/AIRI-Institute/gigaevo-platform/tree/main), [station](https://github.com/dualverse-ai/station), [autoresearch](https://github.com/karpathy/autoresearch), [GEPA](https://github.com/gepa-ai/gepa), and [CodeEvolve](https://github.com/inter-co/science-codeevolve).
-
-### Reinforcement-learning-based
-
-[ThetaEvolve](https://github.com/ypwang61/ThetaEvolve) and [TTT-Discover](https://github.com/test-time-training/discover).
+[AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/), [ShinkaEvolve](https://github.com/SakanaAI/ShinkaEvolve), [OpenEvolve](https://github.com/algorithmicsuperintelligence/openevolve), [LLM4AD](https://github.com/Optima-CityU/llm4ad), [skydiscover / AdaEvolve](https://github.com/skydiscover-ai/skydiscover), [GigaEvo](https://github.com/AIRI-Institute/gigaevo-platform/tree/main), [station](https://github.com/dualverse-ai/station), [autoresearch](https://github.com/karpathy/autoresearch), [GEPA](https://github.com/gepa-ai/gepa), and [CodeEvolve](https://github.com/inter-co/science-codeevolve), [ThetaEvolve](https://github.com/ypwang61/ThetaEvolve), [TTT-Discover](https://github.com/test-time-training/discover), [Guidance-TTT](https://github.com/Human-Agent-Society/reef/tree/guidance-ttt-support), [ScientistTwo](https://scientist-two.github.io), [autoresearch](https://github.com/karpathy/autoresearch), [RD-Agent](https://github.com/microsoft/RD-Agent), [Agent Laboratory](https://github.com/SamuelSchmidgall/AgentLaboratory), [AI-Scientist](https://github.com/SakanaAI/AI-Scientist), [AI-Scientist-v2](https://github.com/SakanaAI/AI-Scientist-v2), [AutoResearchClaw](https://github.com/aiming-lab/AutoResearchClaw), [ClawPhD](https://github.com/ZhihaoAIRobotic/ClawPhD), [Dr. Claw](https://github.com/OpenLAIR/dr-claw), [FARS](https://analemma.ai/fars), [EvoScientist](https://github.com/EvoScientist/EvoScientist), [ScienceClaw](https://github.com/beita6969/ScienceClaw), [claude-scholar](https://github.com/Galaxy-Dawn/claude-scholar), [Research-Claw](https://github.com/wentorai/Research-Claw), [DeepScientist](https://github.com/ResearAI/DeepScientist), [CycleResearcher](https://github.com/zhu-minjun/Researcher), [AutoSOTA](https://github.com/tsinghua-fib-lab/AutoSOTA), [Google Teamwork](https://antigravity.google/blog/teamwork-when-ai-becomes-a-research-partner), [AutoReproduce](https://github.com/AI9Stars/AutoReproduce), [RECLAIM](https://github.com/mithils3/reclaim), [ICML 2026 Repro Challenge](https://huggingface.co/ICML-2026-agent-repro/challenge)

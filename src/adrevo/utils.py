@@ -63,11 +63,28 @@ def extract_file_to_string(zip_bytes: bytes, filename: str) -> str:
         return zf.read(filename).decode("utf-8")
 
 
-def extract_bytes_to_dir(zip_bytes: bytes, extract_to: str | Path) -> None:
-    """Extracts an in-memory zip archive to a target directory."""
+def extract_bytes_to_dir(
+    zip_bytes: bytes,
+    extract_to: str | Path,
+    files_to_omit: frozenset = frozenset(),
+    files_to_extract: frozenset | None = None,
+) -> None:
+    """Extract an in-memory zip archive, optionally selecting specific files."""
     buffer = io.BytesIO(zip_bytes)
+    extract_root = Path(extract_to)
     with zipfile.ZipFile(buffer, "r") as zf:
-        zf.extractall(extract_to)
+        for member in zf.infolist():
+            member_path = Path(member.filename)
+            if member_path.name in files_to_omit:
+                continue
+            if files_to_extract is not None and member.filename not in files_to_extract:
+                continue
+            zf.extract(member, extract_root)
+
+
+def read_last_line(filepath: str | Path) -> str:
+    with open(filepath, "r", encoding="utf-8") as f:
+        return f.readlines()[-1].rstrip("\n")
 
 
 def extract_parent_bytes_to_dir(zip_bytes: bytes, extract_to: str | Path) -> None:

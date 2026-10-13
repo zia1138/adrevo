@@ -4,6 +4,7 @@ import concurrent.futures
 import shutil
 import typer
 import runpy
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,14 @@ import ray
 
 from adrevo.config import AdrevoConfig, validate_adrevo
 from adrevo.driver import AdrevoDriver
+from adrevo.coding_agents import Codex
+from adrevo.plan2build import (
+    build_prompt,
+    critique_prompt,
+    initial_plan_prompt,
+    refine_plan_prompt,
+)
+from adrevo.utils import zip_dir_to_bytes, extract_bytes_to_dir, read_last_line
 
 app = typer.Typer()
 
@@ -32,6 +41,173 @@ def main() -> None:
     bars = "".join("|" * len(selected) + " " * len(rest) for selected, rest in parts)
     bars = typer.style(bars.rstrip(), fg=typer.colors.GREEN)
     typer.echo(f"  {bars}\n  {label}\n  {bars}\n")
+
+
+@app.command()
+def plan(
+    project_dir: str = typer.Argument(
+        ...,
+        help="Path to project/data folder.",
+    ),
+    results_dir: str = typer.Argument(
+        ...,
+        help="Path to results folder.",
+    ),
+    max_refinements: int = typer.Option(
+        3,
+        min=0,
+        help="Maximum number of plan refinements after the initial plan.",
+    ),
+) -> None:
+    """Develop a research plan."""
+
+    results_path = Path(results_dir)
+    if results_path.exists():
+        should_overwrite = questionary.confirm(
+            f"Results directory '{results_path}' already exists. Overwrite it?",
+            default=False,
+        ).ask()
+        if not should_overwrite:
+            raise typer.Abort()
+
+        if results_path.is_dir():
+            shutil.rmtree(results_path)
+        else:
+            results_path.unlink()
+
+    results_path.mkdir(parents=True)
+    project_bytes = zip_dir_to_bytes(project_dir)
+    extract_bytes_to_dir(project_bytes, results_path)
+
+    codex = Codex(cwd=results_dir, model="gpt-5.6-terra", reasoning_effort="medium")
+    codex.initial_msg(initial_plan_prompt)
+    for version in range(1, max_refinements + 2):
+        plan_path = results_path / f"PLAN_v{version}.md"
+        if not plan_path.is_file():
+            typer.echo(f"Error: Expected plan file was not created: {plan_path}", err=True)
+            raise typer.Exit(code=1)
+
+        codex.send_msg(critique_prompt.format(version=version))
+        critique_path = results_path / f"CRITIQUE_v{version}.md"
+        try:
+            verdict = read_last_line(critique_path).strip().strip("*`").upper()
+        except (OSError, IndexError) as exc:
+            typer.echo(f"Error: Could not read critique: {critique_path}", err=True)
+            raise typer.Exit(code=1) from exc
+
+        if verdict == "ACCEPT":
+            typer.echo(f"Accepted plan: {plan_path}")
+            return
+        if verdict != "REFINE":
+            typer.echo(
+                f"Error: Expected ACCEPT or REFINE on the last line of {critique_path}; got {verdict!r}.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if version == max_refinements + 1:
+            typer.echo(
+                f"Refinement limit reached ({max_refinements}); "
+                f"latest plan is not accepted: {plan_path}"
+            )
+            return
+
+        codex.send_msg(refine_plan_prompt.format(version=version, next_version=version + 1))
+
+
+@app.command()
+def build(
+    project_dir: str = typer.Argument(
+        ...,
+        help="Path to project folder containing PLAN_vX.md files.",
+    ),
+    results_dir: str = typer.Argument(
+        ...,
+        help="Path to results folder.",
+    ),
+
+) -> None:
+    """Build and validate an experimental world."""
+    project_path = Path(project_dir).expanduser().resolve()
+    if not project_path.is_dir():
+        raise typer.BadParameter(
+            f"Project directory does not exist: {project_path}",
+            param_hint="project_dir",
+        )
+
+    plan_files = sorted(
+        (
+            path
+            for path in project_path.iterdir()
+            if path.is_file() and re.fullmatch(r"PLAN_v(\d+)\.md", path.name)
+        ),
+        key=lambda path: int(re.fullmatch(r"PLAN_v(\d+)\.md", path.name).group(1)),
+        reverse=True,
+    )
+    if not plan_files:
+        raise typer.BadParameter(
+            f"No PLAN_vX.md files found in {project_path}",
+            param_hint="project_dir",
+        )
+    if not (project_path / "BACKGROUND.md").is_file():
+        raise typer.BadParameter(
+            f"BACKGROUND.md is required in {project_path}",
+            param_hint="project_dir",
+        )
+
+    selected_plan_name = questionary.select(
+        "Select the plan to build:",
+        choices=[path.name for path in plan_files],
+    ).ask()
+    if selected_plan_name is None:
+        raise typer.Abort()
+
+    results_path = Path(results_dir).expanduser().resolve()
+    if results_path == project_path:
+        raise typer.BadParameter(
+            "Results directory must differ from the project directory.",
+            param_hint="results_dir",
+        )
+    if results_path.exists():
+        should_overwrite = questionary.confirm(
+            f"Results directory '{results_path}' already exists. Overwrite it?",
+            default=False,
+        ).ask()
+        if not should_overwrite:
+            raise typer.Abort()
+        if results_path.is_dir():
+            shutil.rmtree(results_path)
+        else:
+            results_path.unlink()
+
+    selected_files = frozenset({selected_plan_name, "BACKGROUND.md"})
+    project_bytes = zip_dir_to_bytes(project_path)
+    results_path.mkdir(parents=True)
+    extract_bytes_to_dir(
+        project_bytes,
+        results_path,
+        files_to_extract=selected_files,
+    )
+
+    build_instructions = build_prompt.replace("{plan_file}", selected_plan_name)
+    (results_path / "BUILD.md").write_text(build_instructions, encoding="utf-8")
+
+    typer.echo()
+    typer.secho("Build workspace is ready.", fg=typer.colors.GREEN, bold=True)
+    typer.echo("Run this from your terminal:")
+    typer.secho(
+        f"cd {results_path} && codex 'Read BUILD.md, the selected plan, and BACKGROUND.md, then build the evaluation environment.'",
+        fg=typer.colors.CYAN,
+        bold=True,
+    )
+    typer.echo("Or change into the build directory and start Codex interactively:")
+    typer.secho(f"cd {results_path}", fg=typer.colors.CYAN, bold=True)
+    typer.secho("codex", fg=typer.colors.CYAN, bold=True)
+    typer.echo("Then paste this prompt:")
+    typer.secho(
+        "Read BUILD.md, the selected plan, and BACKGROUND.md, then build the evaluation environment.",
+        fg=typer.colors.CYAN,
+        bold=True,
+    )
 
 
 @dataclass(frozen=True)
