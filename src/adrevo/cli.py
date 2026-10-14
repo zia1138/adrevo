@@ -5,6 +5,7 @@ import shutil
 import typer
 import runpy
 import re
+import shlex
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,11 +17,9 @@ from adrevo.driver import AdrevoDriver
 from adrevo.coding_agents import Codex
 from adrevo.plan2build import (
     build_prompt,
-    critique_prompt,
-    initial_plan_prompt,
-    refine_plan_prompt,
+    plan_prompt,
 )
-from adrevo.utils import zip_dir_to_bytes, extract_bytes_to_dir, read_last_line
+from adrevo.utils import zip_dir_to_bytes, extract_bytes_to_dir
 
 app = typer.Typer()
 
@@ -53,11 +52,6 @@ def plan(
         ...,
         help="Path to results folder.",
     ),
-    max_refinements: int = typer.Option(
-        3,
-        min=0,
-        help="Maximum number of plan refinements after the initial plan.",
-    ),
 ) -> None:
     """Develop a research plan."""
 
@@ -80,45 +74,31 @@ def plan(
     extract_bytes_to_dir(project_bytes, results_path)
 
     codex = Codex(cwd=results_dir, model="gpt-5.6-terra", reasoning_effort="medium")
-    codex.initial_msg(initial_plan_prompt)
-    for version in range(1, max_refinements + 2):
-        plan_path = results_path / f"PLAN_v{version}.md"
-        if not plan_path.is_file():
-            typer.echo(f"Error: Expected plan file was not created: {plan_path}", err=True)
-            raise typer.Exit(code=1)
+    codex.initial_msg(plan_prompt)
+    if codex.session_id is None:
+        typer.echo("Error: Codex did not return a session ID.", err=True)
+        raise typer.Exit(code=1)
 
-        codex.send_msg(critique_prompt.format(version=version))
-        critique_path = results_path / f"CRITIQUE_v{version}.md"
-        try:
-            verdict = read_last_line(critique_path).strip().strip("*`").upper()
-        except (OSError, IndexError) as exc:
-            typer.echo(f"Error: Could not read critique: {critique_path}", err=True)
-            raise typer.Exit(code=1) from exc
+    typer.echo(f"Codex session ID: {codex.session_id}")
+    typer.echo("Resume this session to improve the plan:")
+    typer.secho(
+        f"cd {shlex.quote(str(results_path.resolve()))} && codex resume {shlex.quote(codex.session_id)}",
+        fg=typer.colors.CYAN,
+        bold=True,
+    )
 
-        if verdict == "ACCEPT":
-            typer.echo(f"Accepted plan: {plan_path}")
-            return
-        if verdict != "REFINE":
-            typer.echo(
-                f"Error: Expected ACCEPT or REFINE on the last line of {critique_path}; got {verdict!r}.",
-                err=True,
-            )
-            raise typer.Exit(code=1)
-        if version == max_refinements + 1:
-            typer.echo(
-                f"Refinement limit reached ({max_refinements}); "
-                f"latest plan is not accepted: {plan_path}"
-            )
-            return
-
-        codex.send_msg(refine_plan_prompt.format(version=version, next_version=version + 1))
+    plan_path = results_path / "PLAN.md"
+    if not plan_path.is_file():
+        typer.echo(f"Error: Expected plan file was not created: {plan_path}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"Created plan: {plan_path}")
 
 
 @app.command()
 def build(
     project_dir: str = typer.Argument(
         ...,
-        help="Path to project folder containing PLAN_vX.md files.",
+        help="Path to project folder containing PLAN.md or PLAN_vX.md files.",
     ),
     results_dir: str = typer.Argument(
         ...,
@@ -143,9 +123,11 @@ def build(
         key=lambda path: int(re.fullmatch(r"PLAN_v(\d+)\.md", path.name).group(1)),
         reverse=True,
     )
+    if (project_path / "PLAN.md").is_file():
+        plan_files.insert(0, project_path / "PLAN.md")
     if not plan_files:
         raise typer.BadParameter(
-            f"No PLAN_vX.md files found in {project_path}",
+            f"No PLAN.md or PLAN_vX.md files found in {project_path}",
             param_hint="project_dir",
         )
     if not (project_path / "BACKGROUND.md").is_file():

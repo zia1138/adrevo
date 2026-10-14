@@ -8,7 +8,7 @@ Inspired by [AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-ge
 
 ## Plan and build an evaluation environment
 
-Start with a project containing code/data and `BACKGROUND.md` describing related work. `plan` uses the Codex CLI to write, critique, and refine versioned research plans (up to three refinements by default).
+Start with a project containing code/data and `BACKGROUND.md` describing related work. `plan` uses the Codex CLI to write `PLAN.md`, then displays the session ID and a command to resume it and improve the plan interactively.
 
 ```bash
 uv run adrevo plan my-project plans

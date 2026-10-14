@@ -2,10 +2,11 @@
 
 import textwrap
 
-initial_plan_prompt = textwrap.dedent("""\
-    Read the code in the current folder and the related work in `BACKGROUND.md`.
+plan_prompt = textwrap.dedent("""\
+    Read the related work in `BACKGROUND.md`.
+    If it is present, read the code in the current folder.
 
-    Write version 1 of a research plan to `PLAN_v1.md`.
+    Write a research plan to `PLAN.md`.
 
     The goal is to identify the **highest-impact algorithm discovery thesis that is still feasible to evaluate with a focused implementation**.
 
@@ -48,70 +49,6 @@ initial_plan_prompt = textwrap.dedent("""\
 """)
 
 
-critique_prompt = textwrap.dedent("""\
-    Given the plan you created in `PLAN_v{version}.md`, the code in the current folder, and `BACKGROUND.md`.
-
-    Write a critique to `CRITIQUE_v{version}.md`.
-
-    The goal is to determine whether the plan identifies the **highest-impact feasible algorithm discovery thesis** and whether the proposed evaluation can be reduced to the smallest implementation that still makes a convincing scientific case.
-
-    Start by evaluating the **Algorithm discovery thesis**.
-
-    Ask:
-
-    - Does the thesis target an important limitation, tradeoff, or open opportunity in the related work?
-    - Would success represent a meaningful algorithmic advance?
-    - Is the proposed direction stronger than obvious lower-impact alternatives?
-    - Is the thesis specific enough to guide downstream algorithm discovery?
-    - Are the conditions and constraints under which improvement matters clearly defined?
-    - Is there a more impactful thesis that is still realistically evaluable?
-
-    Then evaluate **What needs to be built**.
-
-    Focus aggressively on simplicity and feasibility:
-
-    - Is every baseline necessary?
-    - Is every metric required to support the thesis?
-    - Can the datasets or experimental regimes be reduced?
-    - Are the comparisons fair and aligned?
-    - Can baseline correctness be established realistically?
-    - Does any component require disproportionate engineering effort?
-    - Is the plan trying to prove more than is necessary?
-    - Could a substantially smaller evaluation support the same thesis?
-
-    Do not simplify the plan by replacing a high-impact thesis with an easier but less important one unless the original thesis is genuinely impractical.
-
-    Instead, preserve the strongest feasible thesis and minimize the machinery required to evaluate it.
-
-    Identify anything that is unnecessary, overly ambitious, weakly connected to the thesis, difficult to reproduce, or likely to make the build stage fragile.
-
-    Then propose the **minimum convincing version of the plan**, including:
-
-    1. the final algorithm discovery thesis,
-    2. the exact components that need to be built,
-    3. the minimum set of baselines,
-    4. the minimum set of metrics,
-    5. the minimum datasets or experimental conditions,
-    6. the checks required to trust the baseline results,
-    7. and the evidence required to establish the current frontier and support the thesis.
-
-    Prefer maximum scientific impact per unit of implementation effort.
-
-    Make the last line of `CRITIQUE_v{version}.md` exactly REFINE if the plan can be improved, or ACCEPT if the plan is already the strongest feasible version. Do not add Markdown formatting to this line.
-""")
-
-
-refine_plan_prompt = textwrap.dedent("""\
-    Read `PLAN_v{version}.md`, `CRITIQUE_v{version}.md`, the code in the
-    current folder, and `BACKGROUND.md`.
-
-    Refine the plan in response to the critique and write the complete,
-    self-contained revised plan to `PLAN_v{next_version}.md`.
-""")
-
-
-
-
 build_prompt = textwrap.dedent("""\
     Build a simple, reproducible evaluation environment for the given
     research problem and algorithm discovery thesis described in `{plan_file}`.
@@ -146,6 +83,7 @@ build_prompt = textwrap.dedent("""\
 
     `evo/` contains the implementation intended for evolution.
     `method1/` and `method2/` contain independent comparison methods.
+    `method1`, `method2` etc should be replaced with the method names used in the research plan.
     Any implementation directory may also serve as a starting point
     for evolution.
 
