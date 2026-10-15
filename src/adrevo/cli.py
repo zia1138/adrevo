@@ -73,7 +73,7 @@ def plan(
     project_bytes = zip_dir_to_bytes(project_dir)
     extract_bytes_to_dir(project_bytes, results_path)
 
-    codex = Codex(cwd=results_dir, model="gpt-5.6-terra", reasoning_effort="medium")
+    codex = Codex(cwd=results_dir, model="gpt-6-astra", reasoning_effort="medium")
     codex.initial_msg(plan_prompt)
     if codex.session_id is None:
         typer.echo("Error: Codex did not return a session ID.", err=True)

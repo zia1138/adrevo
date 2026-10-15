@@ -3,199 +3,279 @@
 import textwrap
 
 plan_prompt = textwrap.dedent("""\
-    Read the related work in `BACKGROUND.md`.
-    If it is present, read the code in the current folder.
+Read the related work in `BACKGROUND.md`.
+If present, inspect the code in the current folder.
+Do not perform any web searches. Use only the information provided in the folder.
 
-    Write a research plan to `PLAN.md`.
+Write a research plan to `PLAN.md`.
 
-    The goal is to identify the **highest-impact algorithm discovery thesis that is still feasible to evaluate with a focused implementation**.
+The goal is to design the smallest effective research environment for discovering significant improvements over existing algorithms.
 
-    Start with a section titled **Algorithm discovery thesis**.
+## Algorithm discovery thesis
 
-    State one clear thesis describing the most valuable direction in which a new algorithm should improve on existing methods. The thesis should:
+Start with a section titled **Algorithm discovery thesis**.
 
-    - address an important limitation, tradeoff, or open opportunity in previous work,
-    - explain what kind of algorithmic improvement would matter,
-    - identify the conditions or constraints under which the improvement is meaningful,
-    - and explain why success would constitute a significant advance.
+Identify the most valuable opportunity for a new algorithm to improve on existing methods.
 
-    Before selecting the thesis, consider a small number of plausible discovery directions from the related work. Choose primarily based on expected scientific impact, while rejecting directions whose evaluation would be impractically large or difficult.
+State one clear thesis that:
 
-    Then include a section titled **What needs to be built**.
+- addresses an important limitation, tradeoff, or opportunity in previous work,
+- explains what kind of algorithmic improvement would matter,
+- identifies the conditions under which that improvement is meaningful,
+- and explains why success would constitute a significant advance.
 
-    Describe clearly and comprehensively the smallest evaluation system needed to establish the current baseline and support the algorithm discovery thesis, including:
+Prioritize scientific impact while ensuring the proposed improvement can be evaluated with a focused, feasible implementation.
 
-    - which previous methods must be implemented or integrated,
-    - the common interface they should use,
-    - the datasets or inputs required,
-    - the metrics that must be measured,
-    - the experimental conditions and controls,
-    - and the outputs needed to compare the methods fairly.
+## What must be measured
 
-    The rest of the plan should:
+Derive the evaluation objectives directly from the algorithm discovery thesis.
 
-    - identify the core problem shared by the related work,
-    - summarize only the previous approaches necessary for a convincing comparison,
-    - explain the limitations or tradeoffs that motivate the algorithm discovery thesis,
-    - define what “better” means using the smallest useful set of metrics and constraints,
-    - describe how baseline results will be checked for correctness and consistency with previous work,
-    - state what empirical observations establish the current performance frontier,
-    - state what result from a future algorithm would constitute convincing support for the thesis,
-    - and identify major uncertainties, risks, or reasons the thesis might fail.
+Identify the measurements needed to determine whether a new algorithm achieves the proposed improvement, including any correctness requirements or important tradeoffs.
 
-    Favor directions with substantial potential impact, but reduce the experimental scope to the **minimum convincing evaluation**.
+Define a single numeric `combined_score`, with higher values indicating better algorithms. Explain how the score is calculated and why it captures meaningful progress toward the thesis.
 
-    Avoid low-impact directions chosen only because they are easy. Also avoid broad or ambitious evaluation plans whose implementation burden is not necessary to establish the central thesis.
+The measurements should distinguish genuine algorithmic improvements from existing methods under fair experimental conditions.
+
+## What needs to be built
+
+Design the smallest research environment capable of producing these measurements and supporting novel algorithm discovery.
+
+Use a simple, flat project structure:
+
+    evaluate.py
+    data/
+    evo/
+    method1/
+    method2/
+
+Replace method1 and method2 with the names of the selected baseline methods.
+
+- `evaluate.py` evaluates any implementation directory.
+- `data/` contains shared experimental data and configurations.
+- `evo/` contains the initial algorithm intended for evolution.
+- Each baseline has its own independent implementation directory.
+
+The evaluator uses a Typer CLI:
+
+    uv run evaluate.py run <implementation_directory>
+
+Given an implementation directory, the evaluator prepares and executes
+the algorithm, validates its outputs, computes its score, and writes
+`results.json`.
+
+The primary output is `combined_score`, with additional diagnostic metrics
+when useful.
+
+All algorithms must be evaluated using the same criteria and comparable
+experimental conditions.
+
+Specify:
+
+- Which existing algorithms to implement as baselines and which to use
+  as the initial `evo/` implementation.
+- The common algorithm interface, including inputs, outputs, and how
+  the evaluator invokes each implementation.
+- The datasets or problem instances required and how to obtain or
+  generate them.
+- The correctness checks and experimental conditions needed for
+  reliable measurements.
+- How the evaluator computes the measurements and score defined above.
+
+The evaluator must remain independent of the algorithms being tested.
+New algorithms should be evaluable without changing the evaluation
+criteria.
+
+## Guiding principles
+
+Prioritize scientific impact, simplicity, and meaningful evaluation.
+
+The thesis determines what must be measured, and those measurements
+determine what needs to be built.
+
+Favor the **minimum convincing evaluation** needed to support the thesis.
+
+Avoid unnecessary baselines, experiments, or infrastructure.
+
+Specify what needs to be evaluated and how improvement is measured.
+Leave engineering decisions and implementation details to the build stage.
 """)
+
+
 
 
 build_prompt = textwrap.dedent("""\
-    Build a simple, reproducible evaluation environment for the given
-    research problem and algorithm discovery thesis described in `{plan_file}`.
+Build a complete, scientifically trustworthy research evaluation
+environment following the specification in `PLAN.md`.
 
-    ## Core Design
+Treat `PLAN.md` as authoritative for the evaluation architecture,
+algorithm interfaces, baselines, experimental conditions, metrics,
+and scientific requirements.
 
-    The evaluation environment follows a minimal contract:
+You are responsible for the entire engineering process, including
+implementation planning, development, testing, debugging, and
+experimental verification.
 
-    - Input: A required implementation directory.
-    - Output: A results.json file containing correctness, errors, and metrics.
-    - Execution: evaluate.py owns the complete evaluation lifecycle.
+The objective is a working, reproducible research environment that
+evaluates existing and novel algorithms using consistent criteria
+and produces meaningful, comparable results.
 
-    The evaluator must be independent of the implementation being tested.
-    All implementations, including baselines and evolved algorithms, must
-    be evaluated using identical criteria.
+## Development Process
 
-    ## Directory Structure
+Read `PLAN.md` and inspect the existing code before making changes.
 
-    Use a flat project structure:
+Develop and maintain an incremental implementation plan with concrete
+milestones and verification criteria.
 
-    project/
-    ├── evaluate.py
-    ├── evo/
-    │   ├── main.py
-    │   └── pyproject.toml
-    ├── method1/
-    │   ├── main.py
-    │   └── pyproject.toml
-    └── method2/
-        ├── main.py
-        └── pyproject.toml
+Start with the smallest functioning end-to-end evaluation, then
+progressively implement and validate the required baselines,
+experimental inputs, correctness checks, and metrics.
 
-    `evo/` contains the implementation intended for evolution.
-    `method1/` and `method2/` contain independent comparison methods.
-    `method1`, `method2` etc should be replaced with the method names used in the research plan.
-    Any implementation directory may also serve as a starting point
-    for evolution.
+For each substantial component, determine how its correctness
+will be verified before implementing it.
 
-    ## Evaluation Interface
+Work autonomously through the implementation:
 
-    Use Typer with an explicit `run` command that requires an
-    implementation directory.
+- Organize the work into independently verifiable milestones.
+- Run relevant tests and verification commands after each milestone.
+- Diagnose and resolve failures before proceeding.
+- Record completed work, verification evidence, and unresolved issues.
+- Revise the implementation plan as necessary.
+- Parallelize independent tasks when beneficial while maintaining
+  responsibility for integration and end-to-end correctness.
 
-    Usage:
+Maintain a working system throughout development.
 
-        uv run evaluate.py run evo
-        uv run evaluate.py run method1
-        uv run evaluate.py run method2
+Exercise independent engineering judgment, but do not redefine
+the scientific experiment, interfaces, or evaluation criteria
+specified in `PLAN.md`.
 
-    Example:
+Document any inconsistencies, infeasible requirements, or proposed
+scientific changes for human review.
 
-        from pathlib import Path
-        import typer
+## Evaluation Architecture
 
-        app = typer.Typer()
+Implement the evaluation architecture and interfaces specified
+in `PLAN.md`.
 
-        @app.callback()
-        def cli():
-            \"\"\"Research evaluation environment.\"\"\"
-            pass
+The environment uses a single `evaluate.py` with a Typer CLI:
 
-        @app.command()
-        def run(implementation_dir: Path):
-            \"\"\"Evaluate an implementation.\"\"\"
-            evaluate(implementation_dir.resolve())
+    uv run evaluate.py run <implementation_directory>
 
-        def evaluate(implementation_dir: Path):
-            # Prepare environment, build, execute, collect outputs,
-            # validate, score, and write results.json.
-            ...
+Each algorithm resides in an independent, self-contained directory.
 
-        if __name__ == "__main__":
-            app()
+Given an implementation directory, the evaluator must:
 
-    The explicit command structure should allow additional commands
-    to be introduced later without changing the existing interface.
-    Do not implement additional commands unless needed.
+1. Prepare the required execution environment.
+2. Execute the implementation.
+3. Collect its outputs and artifacts.
+4. Validate correctness and problem constraints.
+5. Compute the specified metrics.
+6. Produce a standardized `results.json`.
 
-    ## Evaluation Lifecycle
+The evaluator owns the complete execution lifecycle.
 
-    Given an implementation directory, evaluate.py must:
+Implement the algorithm input/output contract, metrics, and results
+format as specified in `PLAN.md`.
 
-    1. Prepare: Build, compile, install dependencies, create containers,
-    or deploy to remote infrastructure as needed.
-    2. Execute: Run the selected implementation in its environment.
-    3. Collect: Retrieve outputs, including artifacts from remote jobs.
-    4. Validate: Check correctness, feasibility, and problem constraints.
-    5. Score: Compute meaningful metrics that distinguish solution quality.
-    6. Report: Write results.json using a consistent schema.
+All implementations must use the same validation rules, scoring
+criteria, and comparable experimental conditions.
 
-    Example results.json:
+Keep evaluation logic independent of implementation code.
+Implementations must not control validation or scoring.
 
-        {
-            "correct": true,
-            "error": null,
-            "combined_score": 0.85,
-            "accuracy": 0.92,
-            "runtime_seconds": 1.42
-        }
+Support different implementation languages and execution
+environments as required by the plan.
 
-    The evaluator determines how each implementation is executed.
-    Implementations may use Python, C++, Rust, Docker, Modal, or other
-    technologies without requiring changes to the evaluation interface.
+Standardize inputs and outputs, not internal execution mechanisms.
 
-    ## Requirements
+Ensure independent and concurrent evaluations cannot interfere
+with each other or overwrite results.
 
-    - Identical evaluation: Use the same datasets, validation rules,
-    scoring functions, and comparable resource budgets for all methods.
-    - Self-contained implementations: Each directory contains the code
-    and dependencies required to execute its method.
-    - Reproducibility: Control randomness, execution parameters, and
-    resource limits where appropriate.
-    - Isolation: Prevent collisions between builds, intermediate files,
-    outputs, and concurrent evaluations.
-    - Robustness: Handle build failures, timeouts, execution errors,
-    and invalid outputs gracefully.
-    - Scientific validity: Ensure metrics measure meaningful algorithmic
-    improvements rather than artifacts of the evaluation process.
-    - Evolution compatibility: Keep the implementation in evo/ easy
-    to modify, evaluate, and replace with another starting method.
+Handle build failures, timeouts, execution errors, and invalid
+outputs robustly.
 
-    ## Deliverables
+Keep the architecture simple. Avoid unnecessary frameworks,
+abstractions, or infrastructure.
 
-    1. A complete, working evaluate.py using Typer.
-    2. An evolvable implementation in evo/.
-    3. At least one meaningful comparison implementation in method1/.
-    4. Additional comparison methods when useful.
-    5. A demonstration evaluating each implementation independently
-    and comparing their results.
+## Scientific Verification
 
-    ## Guiding Principles
+Use verification to drive development.
 
-    Prioritize simplicity, scientific validity, and reproducibility.
+Verify the evaluator independently using known results, reference
+implementations, and positive and negative controls where appropriate.
 
-    The evaluator owns the complete execution lifecycle. Do not introduce
-    separate baseline evaluators, execution frameworks, plugin systems,
-    or unnecessary abstractions.
+Demonstrate that the evaluator:
 
-    Keep evaluation logic trusted and separate from implementation code.
-    Implementations must not be able to modify validation rules, scoring
-    criteria, or evaluation datasets.
+- Accepts valid algorithm outputs.
+- Rejects invalid outputs.
+- Computes the specified metrics correctly.
+- Detects meaningful differences between algorithms.
+- Applies consistent criteria to every implementation.
 
-    Standardize the input and output, not the execution mechanism.
+Validate each baseline against known results or independent
+correctness checks.
 
-    Build only what is necessary to evaluate and compare algorithms
-    reliably. Prefer concise, readable code and straightforward interfaces.
-""")
+Investigate unexpected results rather than modifying evaluation
+criteria to accommodate them.
 
+Ensure measured improvements reflect genuine algorithmic differences
+rather than experimental artifacts.
 
+## Experimental Validation
+
+Run the evaluator independently on every required baseline and
+the initial implementation intended for evolution.
+
+Collect the resulting metrics and compare the algorithms according
+to the methodology specified in `PLAN.md`.
+
+Verify that results are reproducible under the specified experimental
+conditions, including appropriate control of randomness, dependencies,
+execution parameters, and resource limits.
+
+Demonstrate that a new implementation can be evaluated without
+modifying the evaluator's validation or scoring logic.
+
+Reproduce the complete evaluation from a clean state using
+documented commands.
+
+## Completion Criteria
+
+The work is complete when the research environment specified in
+`PLAN.md` has been implemented, independently verified, and
+demonstrated through successful evaluations of the required algorithms.
+
+At minimum:
+
+- The evaluation CLI works end to end.
+- Every required algorithm has a working implementation.
+- All implementations satisfy the specified input/output contracts.
+- Correctness checks and metrics have been independently validated.
+- Each algorithm produces a valid `results.json`.
+- Baseline results have been checked against expected behavior.
+- Algorithms have been evaluated and compared under fair conditions.
+- Results are reproducible within documented tolerances.
+- New algorithms can be evaluated through the same interface.
+- The experiments and results have been inspected for inconsistencies.
+
+Report the measured results, verification evidence, discrepancies
+with previous work, and remaining limitations.
+
+If completion is blocked, document the blocker and preserve the
+verified partial implementation.
+
+## Guiding Principles
+
+Prioritize scientific correctness, reproducibility, and simplicity.
+
+Maintain a working system throughout development.
+
+Take ownership of the entire engineering and verification process.
+
+Preserve the scientific specification in `PLAN.md` while exercising
+independent judgment over implementation decisions.
+
+The deliverable is not merely working code. It is a verified research
+environment capable of reliably measuring improvements in new algorithms.
+""")    
 
