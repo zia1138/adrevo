@@ -4,7 +4,6 @@ import concurrent.futures
 import shutil
 import typer
 import runpy
-import re
 import shlex
 from dataclasses import dataclass
 from datetime import datetime
@@ -17,7 +16,8 @@ from adrevo.driver import AdrevoDriver
 from adrevo.coding_agents import Codex
 from adrevo.plan2build import (
     build_prompt,
-    plan_prompt,
+    eval_plan_prompt,
+    research_plan_prompt,
 )
 from adrevo.utils import zip_dir_to_bytes, extract_bytes_to_dir
 
@@ -42,20 +42,28 @@ def main() -> None:
     typer.echo(f"  {bars}\n  {label}\n  {bars}\n")
 
 
-@app.command()
-def plan(
-    project_dir: str = typer.Argument(
-        ...,
-        help="Path to project/data folder.",
-    ),
-    results_dir: str = typer.Argument(
-        ...,
-        help="Path to results folder.",
-    ),
+def _create_plan(
+    project_dir: str,
+    results_dir: str,
+    *,
+    prompt: str,
+    plan_filename: str,
+    plan_label: str,
 ) -> None:
-    """Develop a research plan."""
+    """Copy planning inputs, ask Codex for a plan, and validate its output."""
+    project_path = Path(project_dir).expanduser().resolve()
+    if not project_path.is_dir():
+        raise typer.BadParameter(
+            f"Project directory does not exist: {project_path}",
+            param_hint="project_dir",
+        )
 
-    results_path = Path(results_dir)
+    results_path = Path(results_dir).expanduser().resolve()
+    if results_path == project_path:
+        raise typer.BadParameter(
+            "Results directory must differ from the project directory.",
+            param_hint="results_dir",
+        )
     if results_path.exists():
         should_overwrite = questionary.confirm(
             f"Results directory '{results_path}' already exists. Overwrite it?",
@@ -70,35 +78,74 @@ def plan(
             results_path.unlink()
 
     results_path.mkdir(parents=True)
-    project_bytes = zip_dir_to_bytes(project_dir)
+    project_bytes = zip_dir_to_bytes(project_path)
     extract_bytes_to_dir(project_bytes, results_path)
 
-    codex = Codex(cwd=results_dir, model="gpt-6-astra", reasoning_effort="medium")
-    codex.initial_msg(plan_prompt)
+    codex = Codex(cwd=results_path, model="gpt-6-astra", reasoning_effort="medium")
+    codex.initial_msg(prompt)
     if codex.session_id is None:
         typer.echo("Error: Codex did not return a session ID.", err=True)
         raise typer.Exit(code=1)
 
     typer.echo(f"Codex session ID: {codex.session_id}")
-    typer.echo("Resume this session to improve the plan:")
+    typer.echo(f"Resume this session to improve the {plan_label}:")
     typer.secho(
         f"cd {shlex.quote(str(results_path.resolve()))} && codex resume {shlex.quote(codex.session_id)}",
         fg=typer.colors.CYAN,
         bold=True,
     )
 
-    plan_path = results_path / "PLAN.md"
+    plan_path = results_path / plan_filename
     if not plan_path.is_file():
         typer.echo(f"Error: Expected plan file was not created: {plan_path}", err=True)
         raise typer.Exit(code=1)
-    typer.echo(f"Created plan: {plan_path}")
+    typer.echo(f"Created {plan_label}: {plan_path}")
+
+
+@app.command("research-plan")
+def research_plan(
+    project_dir: str = typer.Argument(..., help="Path to project/data folder."),
+    results_dir: str = typer.Argument(..., help="Path to results folder."),
+) -> None:
+    """Develop a research thesis from related work."""
+    _create_plan(
+        project_dir,
+        results_dir,
+        prompt=research_plan_prompt,
+        plan_filename="RESEARCH_PLAN.md",
+        plan_label="research plan",
+    )
+
+
+@app.command("eval-plan")
+def eval_plan(
+    project_dir: str = typer.Argument(
+        ..., help="Path to a project folder containing RESEARCH_PLAN.md."
+    ),
+    results_dir: str = typer.Argument(..., help="Path to results folder."),
+) -> None:
+    """Design an evaluation system for an existing research thesis."""
+    project_path = Path(project_dir).expanduser().resolve()
+    research_plan_path = project_path / "RESEARCH_PLAN.md"
+    if not research_plan_path.is_file():
+        raise typer.BadParameter(
+            f"RESEARCH_PLAN.md is required in {project_path}",
+            param_hint="project_dir",
+        )
+    _create_plan(
+        project_dir,
+        results_dir,
+        prompt=eval_plan_prompt,
+        plan_filename="EVAL_PLAN.md",
+        plan_label="evaluation plan",
+    )
 
 
 @app.command()
 def build(
     project_dir: str = typer.Argument(
         ...,
-        help="Path to project folder containing PLAN.md or PLAN_vX.md files.",
+        help="Path to project folder containing EVAL_PLAN.md.",
     ),
     results_dir: str = typer.Argument(
         ...,
@@ -114,20 +161,10 @@ def build(
             param_hint="project_dir",
         )
 
-    plan_files = sorted(
-        (
-            path
-            for path in project_path.iterdir()
-            if path.is_file() and re.fullmatch(r"PLAN_v(\d+)\.md", path.name)
-        ),
-        key=lambda path: int(re.fullmatch(r"PLAN_v(\d+)\.md", path.name).group(1)),
-        reverse=True,
-    )
-    if (project_path / "PLAN.md").is_file():
-        plan_files.insert(0, project_path / "PLAN.md")
-    if not plan_files:
+    selected_plan_name = "EVAL_PLAN.md"
+    if not (project_path / selected_plan_name).is_file():
         raise typer.BadParameter(
-            f"No PLAN.md or PLAN_vX.md files found in {project_path}",
+            f"EVAL_PLAN.md is required in {project_path}",
             param_hint="project_dir",
         )
     if not (project_path / "BACKGROUND.md").is_file():
@@ -135,13 +172,6 @@ def build(
             f"BACKGROUND.md is required in {project_path}",
             param_hint="project_dir",
         )
-
-    selected_plan_name = questionary.select(
-        "Select the plan to build:",
-        choices=[path.name for path in plan_files],
-    ).ask()
-    if selected_plan_name is None:
-        raise typer.Abort()
 
     results_path = Path(results_dir).expanduser().resolve()
     if results_path == project_path:
@@ -170,7 +200,7 @@ def build(
         files_to_extract=selected_files,
     )
 
-    build_instructions = build_prompt.replace("{plan_file}", selected_plan_name)
+    build_instructions = build_prompt.replace("PLAN.md", selected_plan_name)
     (results_path / "BUILD.md").write_text(build_instructions, encoding="utf-8")
 
     typer.echo()

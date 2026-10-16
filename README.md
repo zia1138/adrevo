@@ -8,14 +8,19 @@ Inspired by [AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-ge
 
 ## Plan and build an evaluation environment
 
-Start with a project containing code/data and `BACKGROUND.md` describing related work. `plan` uses the Codex CLI to write `PLAN.md`, then displays the session ID and a command to resume it and improve the plan interactively.
+Start with a project containing `BACKGROUND.md` describing related work and, optionally, existing code or data. Planning is deliberately split into a scientific phase and an evaluation-design phase. Each command uses the Codex CLI and prints a session ID plus a command for resuming that stage interactively.
 
 ```bash
-uv run adrevo plan my-project plans
-uv run adrevo build plans build-workspace
+uv run adrevo research-plan my-project research-plans
+uv run adrevo eval-plan research-plans eval-plans
+uv run adrevo build eval-plans build-workspace
 ```
 
-`build` lets you select a plan, copies it with `BACKGROUND.md` into a new workspace, and writes `BUILD.md` with instructions for creating the evaluator and comparison implementations.
+`research-plan` writes `RESEARCH_PLAN.md`. It selects one high-impact algorithm-discovery thesis from the related work and specifies the evidence required to support it: the measurements, correctness requirements, tradeoffs, relevant problem instances, experimental controls, and comparison methods.
+
+`eval-plan` reads `RESEARCH_PLAN.md` and writes a self-contained `EVAL_PLAN.md`. It preserves the research thesis, defines the exact metrics and `combined_score`, and specifies a concrete, minimal evaluation harness: its files, algorithm interface, data, comparison implementations, dependencies, validation, resource budgets, and experimental controls.
+
+`build` requires the self-contained `EVAL_PLAN.md` and `BACKGROUND.md`; it does not need `RESEARCH_PLAN.md`. It copies those two files into a new workspace, then writes `BUILD.md` with instructions for implementing and validating the evaluator and comparison algorithms.
 
 ## Run example evolution
 
