@@ -2,50 +2,67 @@
 
 import textwrap
 
+
+# research plan prompt below ------------------------------------------------------------------------------
+
 research_plan_prompt = textwrap.dedent("""\
 Read the related work in `BACKGROUND.md`. If present, inspect the code in the current folder.
 Do not perform any web searches. Use only the information provided in the folder.
 
 Write a research plan to `RESEARCH_PLAN.md`.
 
-The goal is to identify the most scientifically valuable opportunity for a new
-algorithm to improve on existing methods and define the evidence needed to
-demonstrate that improvement.
+The goal is to identify the highest-impact opportunity for improving existing
+algorithms and define the evidence needed to demonstrate an advance.
+
+Focus on identifying one decisive experiment and its measurements that would
+demonstrate an advance, not proposing an improved algorithm.
 
 ## Algorithm discovery thesis
 
 Start with a section titled **Algorithm discovery thesis**.
 
-Identify the highest-impact opportunity for a new algorithm to improve on existing methods.
+Identify the most scientifically valuable limitation, tradeoff, or unsolved
+problem in existing methods that presents an opportunity for algorithmic improvement.
 
 State one clear thesis that:
 
-- addresses an important limitation, tradeoff, or opportunity in previous work,
-- explains what kind of algorithmic improvement would matter,
-- identifies the conditions under which that improvement is meaningful,
-- and explains why success would constitute a significant advance.
+- identifies the specific problem or limitation in existing methods,
+- explains why it matters and what makes it scientifically important,
+- describes the improvement that would constitute an advance,
+- and identifies the conditions under which that improvement would matter.
 
-Prioritize scientific impact while ensuring the proposed improvement can be evaluated
-with a focused, feasible implementation.
+Describe the desired improvement in terms of observable outcomes, not a
+proposed algorithm, mechanism, or implementation.
 
-## What must be measured
+Prioritize scientific impact while ensuring the opportunity can be investigated
+through one focused, feasible experiment.
 
-Derive the evaluation objectives directly from the algorithm discovery thesis.
+## Experiment and measurements
 
-Identify:
+Identify the single most compelling experiment for determining whether a
+hypothetical new algorithm represents an improvement over existing methods.
 
-- the primary metrics needed to demonstrate the claimed improvement,
-- correctness requirements and important tradeoffs,
-- experimental conditions and problem instances where the improvement matters,
-- controls needed to distinguish genuine improvements from experimental artifacts,
-- and what results would constitute convincing evidence of a significant advance.
+Derive the experiment directly from the algorithm discovery thesis.
 
-Focus on measurements that directly test the thesis rather than generic benchmarks.
-Where multiple objectives matter, specify the relevant tradeoffs or Pareto frontier.
+1. Describe the experiment, the scientific question it addresses, and the
+   conditions or problem instances under which it should be conducted.
+
+2. Under a **Measurements** subsection, specify:
+   - exactly what must be measured and how each metric is defined,
+   - correctness requirements and important performance tradeoffs,
+   - what must be controlled to ensure fair comparisons,
+   - and what results would constitute evidence of improvement.
+
+The experiment should directly test the central claim of the thesis rather
+than reproduce a generic benchmark. Where multiple objectives matter,
+specify the relevant tradeoffs or Pareto frontier.
+
+Choose an experiment that maximizes scientific significance while remaining
+focused and feasible to implement.
 
 ## Methods to compare against
 
-Identify the existing methods most relevant to testing the algorithm discovery thesis.
+Identify the existing methods most relevant to the selected experiment.
 
 Select comparison methods that collectively establish whether the proposed
 improvement is meaningful, including:
@@ -58,7 +75,7 @@ For each method, explain:
 
 - why it is necessary to test the thesis,
 - what performance or tradeoff it represents,
-- and what a new algorithm would need to demonstrate relative to it.
+- and what a hypothetical improved algorithm would need to demonstrate relative to it.
 
 Prioritize comparisons that establish whether a new algorithm advances the
 state of the art or improves the relevant performance frontier.
@@ -69,39 +86,49 @@ Keep the comparison set focused, scientifically compelling, and feasible to impl
 
 The research plan should form a coherent scientific argument:
 
-    Highest-impact improvement thesis
-        -> What evidence would demonstrate success
-        -> Which methods must be compared
+    Highest-impact problem or opportunity
+        -> One decisive experiment
+            -> Measurements required to demonstrate improvement
+        -> Methods to compare against
 
-Choose measurements and comparison methods specifically to test the thesis,
-not merely to reproduce standard benchmarks.
+Focus on defining a valuable, measurable opportunity for algorithm discovery.
+
+Do not propose new algorithms, solution mechanisms, architectures, or
+implementation strategies. Discovering how to achieve the improvement is
+a separate research activity.
+
+Choose the experiment, measurements, and comparison methods specifically to
+test the thesis, not merely to reproduce a standard benchmark.
 
 Prioritize scientific significance, rigorous evidence, and feasibility.
 
 Do not design the evaluation infrastructure or prescribe implementation details.
 Those belong in a separate evaluation plan.
 
-Be concise, specific, and decisive. Select one research direction rather than
-proposing multiple competing theses.
+Be concise, specific, and decisive. Select one high-impact opportunity and
+one compelling experiment rather than proposing multiple research directions
+or experiments.
 """)
 
+# eval plan prompt below ------------------------------------------------------------------------------
 
 eval_plan_prompt = textwrap.dedent("""\
 Read `RESEARCH_PLAN.md`, the related work in `BACKGROUND.md`, and, if present,
 the code in the current folder. Do not perform any web searches. Use only the
 information provided in the folder.
 
-Write an evaluation implementation plan to `EVAL_PLAN.md`.
+Write an evaluation plan to `EVAL_PLAN.md`.
 
-Treat the algorithm discovery thesis in `RESEARCH_PLAN.md` as the scientific
-objective. Do not replace it with a different research direction.
+Treat the algorithm discovery thesis and experiment in `RESEARCH_PLAN.md` as
+the scientific objectives. Do not replace them with a different research
+direction or introduce additional experiments.
 
-The goal is to produce a concrete, actionable plan for building the smallest
-effective evaluation harness that can convincingly test the thesis and support
-discovery of improved algorithms.
+The goal is to produce a concrete implementation plan for the smallest
+effective evaluation harness that can execute the experiment, measure the
+proposed improvement, and support discovery of improved algorithms.
 
-Make the scientific and engineering decisions necessary for a coding agent
-to implement and validate the complete environment without redesigning it.
+Make the scientific and engineering decisions needed for a coding agent to
+build and validate the complete environment.
 
 ## Scoring system
 
@@ -117,12 +144,12 @@ Specify:
 - Why the score captures meaningful progress toward the research thesis.
 
 The score must distinguish genuine algorithmic improvements from artifacts
-and preserve the important tradeoffs identified in the research plan.
+while preserving the important tradeoffs identified in the experiment.
 
 ## What needs to be built
 
-Design the smallest evaluation harness capable of producing the measurements
-specified in `RESEARCH_PLAN.md` and supporting novel algorithm discovery.
+Design the smallest evaluation harness capable of executing the experiment
+and producing the measurements specified in `RESEARCH_PLAN.md`.
 
 Use a simple, flat project structure:
 
@@ -158,7 +185,7 @@ the algorithm, validates its outputs, computes its score, and writes
 `results.json`.
 
 The primary output is `combined_score`, with additional diagnostic metrics
-when useful.
+needed to interpret the experimental results.
 
 All algorithms must be evaluated using the same criteria and comparable
 experimental conditions.
@@ -168,12 +195,12 @@ Specify the concrete implementation design:
 - The files and components to build and their responsibilities.
 - The common algorithm interface, including inputs, outputs, and how
   the evaluator invokes each implementation.
-- The datasets or problem instances to use, including how to obtain
-  or generate them and how they are partitioned.
-- The selected comparison algorithms and how to implement them faithfully.
-- The required dependencies, build procedures, and execution environments.
-- The correctness checks, resource budgets, and experimental controls.
-- How the evaluator collects outputs, computes metrics, and writes results.
+- The datasets or problem instances required for the experiment and how
+  to obtain or generate them.
+- The comparison algorithms and how to implement them faithfully.
+- The dependencies, build procedures, and execution environments.
+- The correctness checks, experimental conditions, and resource budgets.
+- How the evaluator computes the measurements and score defined above.
 - How errors, invalid outputs, and execution failures are handled.
 
 The evaluator must remain independent of the algorithms being tested.
@@ -184,7 +211,8 @@ Do not leave important architectural decisions to the build agent.
 
 ## Implementation plan
 
-Provide a clear sequence of steps for building the complete environment.
+Provide a clear sequence of steps for building the complete evaluation
+environment.
 
 For each step, specify:
 
@@ -192,51 +220,41 @@ For each step, specify:
 - The essential implementation details and dependencies.
 - How the completed step should be tested.
 
-Order the steps so that the evaluator and methods can be developed and
-validated incrementally.
+Order the steps so that the environment can be built and validated incrementally.
 
-Keep the plan focused on the smallest complete working system.
-Do not introduce unnecessary abstractions, frameworks, or infrastructure.
+Define the tests, commands, and expected outputs needed to verify that:
 
-## Validation and acceptance criteria
+- The evaluator correctly implements the experiment and its measurements.
+- The comparison algorithms are implemented faithfully.
+- Experimental conditions are fair and reproducible.
+- `new_algorithm/` and every comparison method evaluate successfully.
+- The resulting scores are valid and directly comparable.
 
-Define how the build agent will establish that the environment is complete
-and scientifically trustworthy.
-
-Specify:
-
-- Tests for correctness checks, metric calculations, and scoring.
-- Reference results or known cases for validating the evaluator.
-- Checks that comparison methods are implemented faithfully.
-- Checks for reproducibility and fair experimental conditions.
-- Commands to evaluate every implementation independently.
-- Expected outputs and criteria for successful completion.
-
-The environment must successfully evaluate `new_algorithm/` and all
-comparison methods, producing valid and comparable `results.json` files.
+Keep the implementation plan focused on the smallest complete working system.
 
 ## Guiding principles
 
 Prioritize a scientifically trustworthy, simple, and meaningful evaluation
 system.
 
-The plan must be sufficiently concrete for a coding agent to execute,
-but avoid unnecessary pseudocode or low-level implementation details.
+The plan must be concrete enough for a coding agent to execute without
+redesigning the environment, while avoiding unnecessary implementation details.
 
-Make decisive, justified engineering choices. Preserve the scientific
-objectives and comparison requirements from `RESEARCH_PLAN.md`.
+Standardize the evaluation interface and results, not the execution mechanism.
 
-If a requirement cannot be implemented faithfully, explain the limitation
-and specify the smallest scientifically defensible alternative.
+Avoid unnecessary abstractions, infrastructure, and implementation complexity.
+
+Preserve the scientific objectives of `RESEARCH_PLAN.md`. If a requirement
+cannot be implemented faithfully, explain the limitation and the smallest
+scientifically defensible alternative.
 
 Do not implement the environment. Produce only `EVAL_PLAN.md`.
 
-Be concise, specific, and actionable. The resulting plan should serve
-directly as the specification for the build step.
+Be concise, specific, and decisive. The resulting plan should serve directly
+as the specification for the build step.
 """)
 
-
-
+# build plan prompt below ------------------------------------------------------------------------------
 
 build_prompt = textwrap.dedent("""\
 Build a complete, scientifically trustworthy research evaluation
