@@ -60,27 +60,24 @@ specify the relevant tradeoffs or Pareto frontier.
 Choose an experiment that maximizes scientific significance while remaining
 focused and feasible to implement.
 
-## Methods to compare against
+## Baseline method
 
-Identify the existing methods most relevant to the selected experiment.
+Identify the single strongest relevant existing method for testing the
+algorithm discovery thesis in the selected experiment.
 
-Select comparison methods that collectively establish whether the proposed
-improvement is meaningful, including:
+Choose a baseline that:
 
-- the strongest relevant methods from previous work,
-- methods representing important performance tradeoffs or competing approaches,
-- and simpler baselines when they provide essential context.
+- represents a strong, credible reference from previous work,
+- directly addresses the limitation or tradeoff identified in the thesis,
+- provides a meaningful standard for demonstrating improvement,
+- and is feasible to implement and evaluate faithfully.
 
-For each method, explain:
+Explain why this method is the most informative comparison, what performance
+or tradeoff it represents, and what a hypothetical improved algorithm would
+need to demonstrate relative to it.
 
-- why it is necessary to test the thesis,
-- what performance or tradeoff it represents,
-- and what a hypothetical improved algorithm would need to demonstrate relative to it.
-
-Prioritize comparisons that establish whether a new algorithm advances the
-state of the art or improves the relevant performance frontier.
-
-Keep the comparison set focused, scientifically compelling, and feasible to implement.
+Prioritize scientific relevance and strength over simplicity, while keeping
+the baseline feasible to implement.
 
 ## Guiding principles
 
@@ -89,7 +86,7 @@ The research plan should form a coherent scientific argument:
     Highest-impact problem or opportunity
         -> One decisive experiment
             -> Measurements required to demonstrate improvement
-        -> Methods to compare against
+        -> One strong baseline to compare against
 
 Focus on defining a valuable, measurable opportunity for algorithm discovery.
 
@@ -97,17 +94,17 @@ Do not propose new algorithms, solution mechanisms, architectures, or
 implementation strategies. Discovering how to achieve the improvement is
 a separate research activity.
 
-Choose the experiment, measurements, and comparison methods specifically to
-test the thesis, not merely to reproduce a standard benchmark.
+Choose the experiment, measurements, and baseline specifically to test
+the thesis, not merely to reproduce a standard benchmark.
 
 Prioritize scientific significance, rigorous evidence, and feasibility.
 
 Do not design the evaluation infrastructure or prescribe implementation details.
 Those belong in a separate evaluation plan.
 
-Be concise, specific, and decisive. Select one high-impact opportunity and
-one compelling experiment rather than proposing multiple research directions
-or experiments.
+Be concise, specific, and decisive. Select one high-impact opportunity,
+one compelling experiment, and one strong baseline rather than proposing
+multiple research directions, experiments, or comparison methods.
 """)
 
 # eval plan prompt below ------------------------------------------------------------------------------
@@ -121,7 +118,7 @@ Write an evaluation plan to `EVAL_PLAN.md`.
 
 Treat the algorithm discovery thesis and experiment in `RESEARCH_PLAN.md` as
 the scientific objectives. Do not replace them with a different research
-direction or introduce additional experiments.
+direction or introduce additional experiments or baselines.
 
 The goal is to produce a concrete implementation plan for the smallest
 effective evaluation harness that can execute the experiment, measure the
@@ -157,18 +154,21 @@ Use a simple, flat project structure:
     pyproject.toml
     data/
     new_algorithm/
-    method1/
-    method2/
-    ..
-    methodN/
+    baseline_method/
 
-Replace method1, method2, ..., methodN with the names of the selected comparison algorithms.
+Replace baseline_method with the name of the selected baseline algorithm.
 
 - `evaluate.py` evaluates any implementation directory.
 - `pyproject.toml` defines the uv environment for `evaluate.py`.
 - `data/` contains shared experimental data and configurations.
 - `new_algorithm/` contains the initial algorithm intended for improvement.
-- Each comparison algorithm has its own independent implementation directory.
+- The baseline directory contains an independent implementation of the
+  selected comparison algorithm.
+
+The initial algorithm may use the baseline implementation as its starting
+point. Do not design a new algorithm as part of the evaluation environment.
+
+## Evaluation interface
 
 The evaluator uses a Typer CLI:
 
@@ -177,18 +177,39 @@ The evaluator uses a Typer CLI:
 For example:
 
     uv run evaluate.py run new_algorithm
-    uv run evaluate.py run method1
-    uv run evaluate.py run method2
+    uv run evaluate.py run baseline_method
 
-Given an implementation directory, the evaluator prepares and executes
-the algorithm, validates its outputs, computes its score, and writes
-`results.json`.
+Given an implementation directory, the evaluator:
 
-The primary output is `combined_score`, with additional diagnostic metrics
-needed to interpret the experimental results.
+1. Prepares the execution environment, including building or deploying as needed.
+2. Executes the selected algorithm and collects its outputs.
+3. Validates correctness and computes the evaluation metrics.
+4. Writes `results.json` to the project root, alongside `evaluate.py`.
+
+The output contract is:
+
+    {
+        "correct": true,
+        "error": null,
+        "combined_score": 0.85
+    }
+
+- `correct` indicates whether the implementation passed validation.
+- `error` describes any evaluation failure, or is null on success.
+- `combined_score` is a finite numeric value, with higher values being better.
+- Additional diagnostic metrics may be included when useful.
+
+Every invocation must produce a fresh `results.json` in the project root,
+regardless of which implementation directory is evaluated. Failed evaluations
+must produce a valid result with a noncompetitive score, never leave stale
+results from a previous run.
+
+The evaluator must preserve this interface for every implementation.
 
 All algorithms must be evaluated using the same criteria and comparable
 experimental conditions.
+
+## Implementation design
 
 Specify the concrete implementation design:
 
@@ -197,7 +218,7 @@ Specify the concrete implementation design:
   the evaluator invokes each implementation.
 - The datasets or problem instances required for the experiment and how
   to obtain or generate them.
-- The comparison algorithms and how to implement them faithfully.
+- The selected baseline algorithm and how to implement it faithfully.
 - The dependencies, build procedures, and execution environments.
 - The correctness checks, experimental conditions, and resource budgets.
 - How the evaluator computes the measurements and score defined above.
@@ -225,9 +246,10 @@ Order the steps so that the environment can be built and validated incrementally
 Define the tests, commands, and expected outputs needed to verify that:
 
 - The evaluator correctly implements the experiment and its measurements.
-- The comparison algorithms are implemented faithfully.
+- The baseline algorithm is implemented faithfully.
 - Experimental conditions are fair and reproducible.
-- `new_algorithm/` and every comparison method evaluate successfully.
+- `new_algorithm/` and the baseline evaluate successfully.
+- Each evaluation writes a valid `results.json` to the project root.
 - The resulting scores are valid and directly comparable.
 
 Keep the implementation plan focused on the smallest complete working system.
