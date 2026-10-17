@@ -133,16 +133,19 @@ information provided in the folder.
 
 Write an evaluation plan to `EVAL_PLAN.md`.
 
-Treat the algorithm discovery thesis and experiment in `RESEARCH_PLAN.md` as
-the scientific objectives. Do not replace them with a different research
-direction or introduce additional experiments or baselines.
+Treat the algorithm discovery thesis, experiment, and baseline in
+`RESEARCH_PLAN.md` as the scientific objectives. Do not replace them with
+a different research direction or introduce additional experiments or baselines.
 
 The goal is to produce a concrete implementation plan for the smallest
 effective evaluation harness that can execute the experiment, measure the
-proposed improvement, and support discovery of improved algorithms.
+proposed improvement, and support rapid discovery of improved algorithms.
 
 Make the scientific and engineering decisions needed for a coding agent to
 build and validate the complete environment.
+
+Prioritize small, self-contained implementations and inexpensive repeated
+evaluations. Avoid unnecessary software complexity and infrastructure.
 
 ## Scoring system
 
@@ -159,6 +162,9 @@ Specify:
 
 The score must distinguish genuine algorithmic improvements from artifacts
 while preserving the important tradeoffs identified in the experiment.
+
+Keep scoring computationally inexpensive and suitable for repeated evaluations
+during algorithm discovery.
 
 ## What needs to be built
 
@@ -184,6 +190,10 @@ Replace baseline_method with the name of the selected baseline algorithm.
 
 The initial algorithm may use the baseline implementation as its starting
 point. Do not design a new algorithm as part of the evaluation environment.
+
+Prefer concise, readable implementations with minimal dependencies.
+Avoid reproducing large software systems when the essential algorithm
+can be implemented independently.
 
 ## Evaluation interface
 
@@ -221,10 +231,12 @@ regardless of which implementation directory is evaluated. Failed evaluations
 must produce a valid result with a noncompetitive score, never leave stale
 results from a previous run.
 
-The evaluator must preserve this interface for every implementation.
-
 All algorithms must be evaluated using the same criteria and comparable
 experimental conditions.
+
+The evaluation lifecycle should be efficient enough to execute repeatedly
+across many candidate algorithms. Minimize unnecessary setup, compilation,
+data loading, and infrastructure overhead.
 
 ## Implementation design
 
@@ -243,6 +255,12 @@ Specify the concrete implementation design:
 
 The evaluator must remain independent of the algorithms being tested.
 New algorithms should be evaluable without changing the evaluation criteria.
+
+Favor simple algorithms, small datasets, and lightweight execution environments
+where these are sufficient for scientifically meaningful measurements.
+
+Use external libraries, Docker, Modal, or other infrastructure only when
+justified by the experiment. Prefer local execution when practical.
 
 Choose concrete technologies, interfaces, and implementation approaches.
 Do not leave important architectural decisions to the build agent.
@@ -268,24 +286,27 @@ Define the tests, commands, and expected outputs needed to verify that:
 - `new_algorithm/` and the baseline evaluate successfully.
 - Each evaluation writes a valid `results.json` to the project root.
 - The resulting scores are valid and directly comparable.
+- Evaluations are sufficiently inexpensive for repeated algorithm discovery.
 
 Keep the implementation plan focused on the smallest complete working system.
 
 ## Guiding principles
 
-Prioritize a scientifically trustworthy, simple, and meaningful evaluation
-system.
+Prioritize a scientifically trustworthy, simple, and efficient evaluation
+system suitable for rapid algorithm discovery.
 
 The plan must be concrete enough for a coding agent to execute without
 redesigning the environment, while avoiding unnecessary implementation details.
 
 Standardize the evaluation interface and results, not the execution mechanism.
 
-Avoid unnecessary abstractions, infrastructure, and implementation complexity.
+Favor small, readable codebases, minimal dependencies, and fast evaluations.
+Avoid complex software systems, excessive infrastructure, and unnecessary
+abstractions.
 
 Preserve the scientific objectives of `RESEARCH_PLAN.md`. If a requirement
-cannot be implemented faithfully, explain the limitation and the smallest
-scientifically defensible alternative.
+cannot be implemented faithfully within a small research environment,
+explain the limitation and the smallest scientifically defensible alternative.
 
 Do not implement the environment. Produce only `EVAL_PLAN.md`.
 
@@ -297,33 +318,32 @@ as the specification for the build step.
 
 build_prompt = textwrap.dedent("""\
 Build a complete, scientifically trustworthy research evaluation
-harness following the specification in `PLAN.md`.
+harness following the specification in `EVAL_PLAN.md`.
 
-Treat `PLAN.md` as authoritative for the evaluation architecture,
-algorithm interfaces, comparison algorithms, experimental conditions, metrics,
-and scientific requirements.
+Read `EVAL_PLAN.md`, `RESEARCH_PLAN.md`, and inspect the existing code
+before making changes.
 
-You are responsible for the entire engineering process, including
-implementation planning, development, testing, debugging, and
-experimental verification.
+Treat `EVAL_PLAN.md` as authoritative for the evaluation architecture,
+algorithm interfaces, baseline implementation, experimental conditions,
+metrics, and scientific requirements.
 
-The objective is a working, reproducible research evaluation
-harness that evaluates existing and novel algorithms using consistent criteria
-and produces meaningful, comparable results.
+The objective is a small, working, reproducible evaluation environment
+that executes the selected experiment, evaluates the baseline and initial
+algorithm, and provides a reliable optimization signal for discovering
+improved algorithms.
+
+Prioritize simplicity, correctness, and inexpensive repeated evaluations.
 
 ## Development Process
 
-Read `PLAN.md` and inspect the existing code before making changes.
+Follow the implementation plan in `EVAL_PLAN.md`.
 
-Develop and maintain an incremental implementation plan with concrete
-milestones and verification criteria.
+Develop incrementally, starting with the smallest functioning end-to-end
+evaluation, then implementing and validating the baseline, experimental
+inputs, correctness checks, and metrics.
 
-Start with the smallest functioning end-to-end evaluation, then
-progressively implement and validate the required comparison algorithms,
-experimental inputs, correctness checks, and metrics.
-
-For each substantial component, determine how its correctness
-will be verified before implementing it.
+For each substantial component, determine how its correctness will
+be verified before implementing it.
 
 Work autonomously through the implementation:
 
@@ -331,23 +351,20 @@ Work autonomously through the implementation:
 - Run relevant tests and verification commands after each milestone.
 - Diagnose and resolve failures before proceeding.
 - Record completed work, verification evidence, and unresolved issues.
-- Revise the implementation plan as necessary.
-- Parallelize independent tasks when beneficial while maintaining
-  responsibility for integration and end-to-end correctness.
+- Adjust implementation details as necessary while preserving the plan.
 
 Maintain a working system throughout development.
 
-Exercise independent engineering judgment, but do not redefine
-the scientific experiment, interfaces, or evaluation criteria
-specified in `PLAN.md`.
+Exercise independent engineering judgment, but do not redefine the
+scientific experiment, baseline, interfaces, or evaluation criteria.
 
 Document any inconsistencies, infeasible requirements, or proposed
 scientific changes for human review.
 
 ## Evaluation Architecture
 
-Implement the evaluation architecture and interfaces specified
-in `PLAN.md`.
+Implement the evaluation architecture and interfaces specified in
+`EVAL_PLAN.md`.
 
 The environment uses a single `evaluate.py` with a Typer CLI:
 
@@ -362,12 +379,29 @@ Given an implementation directory, the evaluator must:
 3. Collect its outputs and artifacts.
 4. Validate correctness and problem constraints.
 5. Compute the specified metrics.
-6. Produce a standardized `results.json`.
+6. Write `results.json` to the project root, alongside `evaluate.py`.
+
+The results must follow this contract:
+
+    {
+        "correct": true,
+        "error": null,
+        "combined_score": 0.85
+    }
+
+- `correct` indicates whether the implementation passed validation.
+- `error` describes an evaluation failure, or is null on success.
+- `combined_score` is a finite numeric value, with higher values being better.
+- Additional diagnostic metrics may be included when useful.
+
+Every invocation must produce a fresh `results.json` in the project root.
+Failed evaluations must produce a valid result with a noncompetitive score,
+never leave stale results from a previous invocation.
 
 The evaluator owns the complete execution lifecycle.
 
-Implement the algorithm input/output contract, metrics, and results
-format as specified in `PLAN.md`.
+Implement the algorithm input/output contract, measurements, scoring,
+and results format as specified in `EVAL_PLAN.md`.
 
 All implementations must use the same validation rules, scoring
 criteria, and comparable experimental conditions.
@@ -375,19 +409,16 @@ criteria, and comparable experimental conditions.
 Keep evaluation logic independent of implementation code.
 Implementations must not control validation or scoring.
 
-Support different implementation languages and execution
-environments as required by the plan.
+Support the implementation languages and execution environments
+required by the plan, without introducing unnecessary infrastructure.
 
 Standardize inputs and outputs, not internal execution mechanisms.
-
-Ensure independent and concurrent evaluations cannot interfere
-with each other or overwrite results.
 
 Handle build failures, timeouts, execution errors, and invalid
 outputs robustly.
 
 Keep the architecture simple. Avoid unnecessary frameworks,
-abstractions, or infrastructure.
+abstractions, dependencies, or infrastructure.
 
 ## Scientific Verification
 
@@ -400,55 +431,59 @@ Demonstrate that the evaluator:
 
 - Accepts valid algorithm outputs.
 - Rejects invalid outputs.
-- Computes the specified metrics correctly.
-- Detects meaningful differences between algorithms.
+- Computes the specified metrics and combined_score correctly.
 - Applies consistent criteria to every implementation.
+- Produces reproducible measurements under controlled conditions.
 
-Validate each baseline against known results or independent
-correctness checks.
+Validate the baseline against known results or independent
+correctness checks where available.
 
 Investigate unexpected results rather than modifying evaluation
 criteria to accommodate them.
 
-Ensure measured improvements reflect genuine algorithmic differences
+Ensure the scoring system rewards genuine algorithmic improvements
 rather than experimental artifacts.
 
 ## Experimental Validation
 
-Run the evaluator independently on every required baseline and
-the initial implementation intended for improvement.
+Run the evaluator on the selected baseline and the initial
+implementation in `new_algorithm/`.
 
-Collect the resulting metrics and compare the algorithms according
-to the methodology specified in `PLAN.md`.
+The initial implementation may use the baseline as its starting point.
+Do not invent a new algorithm as part of building the environment.
 
-Verify that results are reproducible under the specified experimental
-conditions, including appropriate control of randomness, dependencies,
-execution parameters, and resource limits.
+Collect and compare the measurements according to `EVAL_PLAN.md`.
 
-Demonstrate that a new implementation can be evaluated without
-modifying the evaluator's validation or scoring logic.
+Verify that:
 
-Reproduce the complete evaluation from a clean state using
-documented commands.
+- Both implementations execute successfully.
+- Each evaluation produces a valid root-level `results.json`.
+- The measured scores are meaningful and directly comparable.
+- Results are reproducible under the specified experimental conditions.
+- Evaluation time and resource requirements are practical for repeated
+  algorithm discovery.
+
+Demonstrate that another implementation directory can be evaluated
+without modifying the evaluator.
+
+Verify the complete evaluation from a clean state using documented commands.
 
 ## Completion Criteria
 
-The work is complete when the research evaluation harness specified in
-`PLAN.md` has been implemented, independently verified, and
-demonstrated through successful evaluations of the required algorithms.
+The work is complete when the evaluation environment specified in
+`EVAL_PLAN.md` has been implemented, verified, and demonstrated.
 
 At minimum:
 
 - The evaluation CLI works end to end.
-- Every required algorithm has a working implementation.
-- All implementations satisfy the specified input/output contracts.
+- The selected baseline is implemented faithfully.
+- The initial algorithm in `new_algorithm/` evaluates successfully.
+- Both implementations satisfy the specified input/output contract.
 - Correctness checks and metrics have been independently validated.
-- Each algorithm produces a valid `results.json`.
-- Baseline results have been checked against expected behavior.
-- Algorithms have been evaluated and compared under fair conditions.
-- Results are reproducible within documented tolerances.
-- New algorithms can be evaluated through the same interface.
-- The experiments and results have been inspected for inconsistencies.
+- Every evaluation writes a valid `results.json` to the project root.
+- The scores are correct, comparable, and reproducible.
+- The evaluator can evaluate new implementations without modification.
+- The environment is sufficiently lightweight for repeated evaluations.
 
 Report the measured results, verification evidence, discrepancies
 with previous work, and remaining limitations.
@@ -458,16 +493,25 @@ verified partial implementation.
 
 ## Guiding Principles
 
-Prioritize scientific correctness, reproducibility, and simplicity.
+Prioritize scientific correctness, simplicity, and reproducibility.
+
+Build the smallest complete system that faithfully implements the
+experiment in `EVAL_PLAN.md`.
+
+Favor concise, readable code, minimal dependencies, and fast evaluations.
+
+Do not introduce additional experiments, baselines, or infrastructure
+beyond what is required by the plan.
 
 Maintain a working system throughout development.
 
 Take ownership of the entire engineering and verification process.
 
-Preserve the scientific specification in `PLAN.md` while exercising
-independent judgment over implementation decisions.
+Preserve the scientific specification while exercising independent
+judgment over routine implementation decisions.
 
-The deliverable is not merely working code. It is a verified research
-environment capable of reliably measuring improvements in new algorithms.
+The deliverable is not merely working code. It is a small, verified
+research environment capable of reliably measuring improvements
+in new algorithms.
 """)    
 
