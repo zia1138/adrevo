@@ -12,10 +12,13 @@ Do not perform any web searches. Use only the information provided in the folder
 Write a research plan to `RESEARCH_PLAN.md`.
 
 The goal is to identify the highest-impact opportunity for improving existing
-algorithms and define the evidence needed to demonstrate an advance.
+algorithms that can be investigated with a small, focused research environment.
 
 Focus on identifying one decisive experiment and its measurements that would
 demonstrate an advance, not proposing an improved algorithm.
+
+Scientific impact is the priority, but implementation complexity and evaluation
+cost must remain low enough to support rapid algorithm discovery.
 
 ## Algorithm discovery thesis
 
@@ -34,8 +37,11 @@ State one clear thesis that:
 Describe the desired improvement in terms of observable outcomes, not a
 proposed algorithm, mechanism, or implementation.
 
-Prioritize scientific impact while ensuring the opportunity can be investigated
-through one focused, feasible experiment.
+Prioritize opportunities involving focused, self-contained algorithms rather
+than improvements requiring large or complex software systems.
+
+Choose an opportunity that can be investigated through one focused, feasible
+experiment with a small implementation and inexpensive evaluations.
 
 ## Experiment and measurements
 
@@ -58,35 +64,39 @@ than reproduce a generic benchmark. Where multiple objectives matter,
 specify the relevant tradeoffs or Pareto frontier.
 
 Choose an experiment that maximizes scientific significance while remaining
-focused and feasible to implement.
+simple to implement, reproducible, and inexpensive to evaluate repeatedly.
 
 ## Baseline method
 
-Identify the single strongest relevant existing method for testing the
-algorithm discovery thesis in the selected experiment.
+Identify a single strong, self-contained algorithmic baseline for testing
+the algorithm discovery thesis in the selected experiment.
 
 Choose a baseline that:
 
-- represents a strong, credible reference from previous work,
+- represents a credible and scientifically meaningful method from previous work,
 - directly addresses the limitation or tradeoff identified in the thesis,
-- provides a meaningful standard for demonstrating improvement,
-- and is feasible to implement and evaluate faithfully.
+- can be implemented faithfully without reproducing a complex software system,
+- has a small, well-defined algorithmic interface,
+- and can be evaluated efficiently across many candidate implementations.
 
-Explain why this method is the most informative comparison, what performance
-or tradeoff it represents, and what a hypothetical improved algorithm would
-need to demonstrate relative to it.
+Prefer a focused algorithm over a complete application, framework, or
+large software package.
 
-Prioritize scientific relevance and strength over simplicity, while keeping
-the baseline feasible to implement.
+Explain why the baseline is the most informative practical comparison,
+what performance or tradeoff it represents, and what a hypothetical
+improved algorithm would need to demonstrate relative to it.
+
+Prioritize scientific relevance and algorithmic simplicity while retaining
+a meaningful standard for improvement.
 
 ## Guiding principles
 
 The research plan should form a coherent scientific argument:
 
-    Highest-impact problem or opportunity
+    Highest-impact tractable problem or opportunity
         -> One decisive experiment
             -> Measurements required to demonstrate improvement
-        -> One strong baseline to compare against
+        -> One strong, self-contained baseline
 
 Focus on defining a valuable, measurable opportunity for algorithm discovery.
 
@@ -97,7 +107,14 @@ a separate research activity.
 Choose the experiment, measurements, and baseline specifically to test
 the thesis, not merely to reproduce a standard benchmark.
 
-Prioritize scientific significance, rigorous evidence, and feasibility.
+Favor problems where the core algorithm can be implemented in a small amount
+of readable code and evaluated quickly without substantial infrastructure.
+
+Avoid research directions that require reproducing large software systems,
+complex dependencies, extensive datasets, or expensive computational resources.
+
+Prioritize scientific significance subject to implementation simplicity,
+evaluation efficiency, and feasibility.
 
 Do not design the evaluation infrastructure or prescribe implementation details.
 Those belong in a separate evaluation plan.
