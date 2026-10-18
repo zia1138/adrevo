@@ -20,6 +20,29 @@ demonstrate an advance, not proposing an improved algorithm.
 Scientific impact is the priority, but implementation complexity and evaluation
 cost must remain low enough to support rapid algorithm discovery.
 
+## Clarity and explanation
+
+Write for a technically sophisticated reader who is unfamiliar with the
+specific research area. The entire plan should be understandable without
+requiring the reader to consult the related literature.
+
+Throughout the plan:
+
+- Explain unfamiliar concepts and terminology when first introduced.
+- Provide intuition for important claims, methods, and measurements.
+- Use simple, concrete examples to clarify ideas that are difficult to
+  understand from abstract descriptions alone.
+- Explain why each important detail matters to the scientific objective.
+- Make the connections between the thesis, experiment, measurements, and
+  baseline explicit.
+
+Assume familiarity with general algorithms, mathematics, and computer science,
+but not specialized knowledge of the research topic.
+
+Favor clear, intuitive explanations over dense technical shorthand.
+Preserve scientific precision, but provide additional explanation whenever
+a concept would otherwise be difficult to understand quickly.
+
 ## Algorithm discovery thesis
 
 Start with a section titled **Algorithm discovery thesis**.
@@ -37,6 +60,9 @@ State one clear thesis that:
 Describe the desired improvement in terms of observable outcomes, not a
 proposed algorithm, mechanism, or implementation.
 
+Explain the underlying problem and why existing algorithms struggle with it.
+Use a concrete example where helpful to make the opportunity intuitive.
+
 Prioritize opportunities involving focused, self-contained algorithms rather
 than improvements requiring large or complex software systems.
 
@@ -53,15 +79,27 @@ Derive the experiment directly from the algorithm discovery thesis.
 1. Describe the experiment, the scientific question it addresses, and the
    conditions or problem instances under which it should be conducted.
 
+   Explain how the experiment works conceptually, what is varied, what is
+   held constant, and why the experiment provides evidence for the thesis.
+   Use a concrete example to make the experimental setup easy to understand.
+
 2. Under a **Measurements** subsection, specify:
    - exactly what must be measured and how each metric is defined,
    - correctness requirements and important performance tradeoffs,
-   - what must be controlled to ensure fair comparisons,
-   - and what results would constitute evidence of improvement.
+   - what must be controlled to ensure fair comparisons.
 
-The experiment should directly test the central claim of the thesis rather
-than reproduce a generic benchmark. Where multiple objectives matter,
-specify the relevant tradeoffs or Pareto frontier.
+   For each important measurement, explain:
+   - what the metric represents and why it matters,
+   - how it is calculated or obtained,
+   - how to interpret its values, including whether higher or lower is better,
+   - and how changes in the metric relate to the proposed improvement.
+
+   Provide simple numerical or conceptual examples where they help clarify
+   the measurement. Explain relationships and tradeoffs between metrics,
+   rather than merely listing their definitions.
+
+The experiment should directly test the central claim of the thesis.
+Where multiple objectives matter, specify the relevant tradeoffs.
 
 Choose an experiment that maximizes scientific significance while remaining
 simple to implement, reproducible, and inexpensive to evaluate repeatedly.
@@ -82,12 +120,11 @@ Choose a baseline that:
 Prefer a focused algorithm over a complete application, framework, or
 large software package.
 
-Explain why the baseline is the most informative practical comparison,
-what performance or tradeoff it represents, and what a hypothetical
-improved algorithm would need to demonstrate relative to it.
+Explain how the baseline works at a conceptual level, using a simple example
+where helpful.
 
-Prioritize scientific relevance and algorithmic simplicity while retaining
-a meaningful standard for improvement.
+Explain why the baseline is the most informative practical comparison and
+what performance or tradeoff it represents.
 
 ## Guiding principles
 
@@ -119,9 +156,13 @@ evaluation efficiency, and feasibility.
 Do not design the evaluation infrastructure or prescribe implementation details.
 Those belong in a separate evaluation plan.
 
-Be concise, specific, and decisive. Select one high-impact opportunity,
-one compelling experiment, and one strong baseline rather than proposing
-multiple research directions, experiments, or comparison methods.
+Be clear, self-contained, specific, and decisive. Provide enough explanation
+and intuition for a technically sophisticated reader to understand the entire
+plan without specialized background.
+
+Select one high-impact opportunity, one compelling experiment, and one strong
+baseline rather than proposing multiple research directions, experiments,
+or comparison methods.
 """)
 
 # eval plan prompt below ------------------------------------------------------------------------------
@@ -155,13 +196,16 @@ algorithms.
 
 Specify:
 
-- The exact metrics and how they are computed.
+- The exact primary and secondary metrics and how they are computed.
 - The formula for `combined_score`, including normalization or weighting.
 - How incorrect, invalid, or failed implementations are scored.
 - Why the score captures meaningful progress toward the research thesis.
 
 The score must distinguish genuine algorithmic improvements from artifacts
 while preserving the important tradeoffs identified in the experiment.
+
+All primary and secondary metrics must be computed and reported independently
+in `results.json`, even when they are not included in `combined_score`.
 
 Keep scoring computationally inexpensive and suitable for repeated evaluations
 during algorithm discovery.
@@ -173,6 +217,7 @@ and producing the measurements specified in `RESEARCH_PLAN.md`.
 
 Use a simple, flat project structure:
 
+    prepare.py
     evaluate.py
     pyproject.toml
     data/
@@ -181,8 +226,9 @@ Use a simple, flat project structure:
 
 Replace baseline_method with the name of the selected baseline algorithm.
 
-- `evaluate.py` evaluates any implementation directory.
-- `pyproject.toml` defines the uv environment for `evaluate.py`.
+- `prepare.py` performs one-time preparation of experimental data and resources.
+- `evaluate.py` executes and evaluates any implementation directory.
+- `pyproject.toml` defines the uv environment for preparation and evaluation.
 - `data/` contains shared experimental data and configurations.
 - `new_algorithm/` contains the initial algorithm intended for improvement.
 - The baseline directory contains an independent implementation of the
@@ -194,6 +240,49 @@ point. Do not design a new algorithm as part of the evaluation environment.
 Prefer concise, readable implementations with minimal dependencies.
 Avoid reproducing large software systems when the essential algorithm
 can be implemented independently.
+
+## Preparation
+
+Design `prepare.py` to perform one-time preparation when needed:
+
+    uv run prepare.py
+
+Preparation may include downloading or generating datasets, preprocessing
+inputs, constructing reference data, or preparing other shared resources.
+
+Prepared resources must be stored in `data/` and reused across evaluations.
+
+Preparation must be separate from evaluation and must not be repeated for
+each algorithm or evaluation run.
+
+Specify the exact preparation steps, generated files, and procedures needed
+to ensure reproducibility.
+
+## Algorithm interface
+
+Define a simple, common interface between the evaluator and every algorithm.
+
+Each algorithm must:
+
+1. Accept experimental inputs in a specified format.
+2. Execute independently using its own implementation and dependencies.
+3. Write its outputs to a file in a specified format.
+
+Specify the exact input and output formats, invocation method, and file paths.
+
+The interface must be identical for the initial algorithm and baseline.
+
+Algorithms must not compute their own evaluation metrics or `combined_score`.
+They only produce outputs from the provided inputs.
+
+The evaluator must independently read these output files, validate correctness,
+and compute all metrics.
+
+Keep algorithms independent of evaluation logic, validation rules, and scoring.
+New algorithms should be evaluable without modifying `evaluate.py`.
+
+The interface should support different programming languages and execution
+environments without introducing unnecessary abstractions.
 
 ## Evaluation interface
 
@@ -208,23 +297,40 @@ For example:
 
 Given an implementation directory, the evaluator:
 
-1. Prepares the execution environment, including building or deploying as needed.
-2. Executes the selected algorithm and collects its outputs.
-3. Validates correctness and computes the evaluation metrics.
-4. Writes `results.json` to the project root, alongside `evaluate.py`.
+1. Loads the prepared experimental inputs from `data/`.
+2. Prepares the algorithm's execution environment if needed.
+3. Executes the algorithm with the required inputs and output file path.
+4. Reads the algorithm's output file.
+5. Validates correctness and computes all evaluation metrics.
+6. Writes `results.json` to the project root, alongside `evaluate.py`.
+
+The evaluator must not repeat the one-time preparation performed by
+`prepare.py`.
+
+Algorithm outputs and intermediate artifacts must remain separate from
+evaluation results. Use fresh output paths to prevent stale or overlapping
+results.
 
 The output contract is:
 
     {
         "correct": true,
         "error": null,
-        "combined_score": 0.85
+        "combined_score": 0.85,
+        "accuracy": 0.92,
+        "runtime_seconds": 1.42,
+        "memory_mb": 128.5
     }
+
+The metrics above are illustrative. Use the actual primary and secondary
+metrics defined by the experiment.
 
 - `correct` indicates whether the implementation passed validation.
 - `error` describes any evaluation failure, or is null on success.
 - `combined_score` is a finite numeric value, with higher values being better.
-- Additional diagnostic metrics may be included when useful.
+- Every primary and secondary metric must be included as a separate field.
+- Metrics must use consistent names, definitions, and units across methods.
+- Unavailable metrics should be reported as null rather than misleading values.
 
 Every invocation must produce a fresh `results.json` in the project root,
 regardless of which implementation directory is evaluated. Failed evaluations
@@ -243,14 +349,16 @@ data loading, and infrastructure overhead.
 Specify the concrete implementation design:
 
 - The files and components to build and their responsibilities.
-- The common algorithm interface, including inputs, outputs, and how
-  the evaluator invokes each implementation.
+- The one-time preparation steps and the data or resources they produce.
+- The common algorithm interface, including exact input and output formats,
+  file paths, and how the evaluator invokes each implementation.
 - The datasets or problem instances required for the experiment and how
   to obtain or generate them.
 - The selected baseline algorithm and how to implement it faithfully.
 - The dependencies, build procedures, and execution environments.
 - The correctness checks, experimental conditions, and resource budgets.
-- How the evaluator computes the measurements and score defined above.
+- How the evaluator reads algorithm outputs and computes the primary and
+  secondary metrics and `combined_score`.
 - How errors, invalid outputs, and execution failures are handled.
 
 The evaluator must remain independent of the algorithms being tested.
@@ -264,6 +372,29 @@ justified by the experiment. Prefer local execution when practical.
 
 Choose concrete technologies, interfaces, and implementation approaches.
 Do not leave important architectural decisions to the build agent.
+
+## Code clarity and documentation
+
+Plan for implementations that are easy for a technically sophisticated reader
+unfamiliar with the specific research area to understand, inspect, and modify.
+
+Specify how the implementation should:
+
+- Use simple, readable code with descriptive names and clear interfaces.
+- Document the purpose, inputs, outputs, and behavior of important functions.
+- Explain non-obvious algorithms, mathematical operations, and assumptions
+  with meaningful comments.
+- Document how each metric is computed and why it matters scientifically.
+- Include a concise README describing preparation, execution, evaluation,
+  and interpretation of results.
+- Keep documentation close to the code it explains.
+
+Comments should explain scientific reasoning and non-obvious behavior,
+not merely restate the code.
+
+Prefer straightforward implementations over clever optimizations or
+unnecessary abstractions. Keep documentation concise but sufficiently
+detailed for someone unfamiliar with the research topic.
 
 ## Implementation plan
 
@@ -280,13 +411,19 @@ Order the steps so that the environment can be built and validated incrementally
 
 Define the tests, commands, and expected outputs needed to verify that:
 
-- The evaluator correctly implements the experiment and its measurements.
+- `prepare.py` produces the required shared data and resources.
+- Prepared data can be reused without repeating preparation.
+- Both algorithms accept the same input format and produce valid output files.
+- The evaluator correctly reads algorithm outputs and validates correctness.
+- All primary and secondary metrics are calculated correctly and reported.
+- `combined_score` is calculated correctly from the specified measurements.
 - The baseline algorithm is implemented faithfully.
 - Experimental conditions are fair and reproducible.
 - `new_algorithm/` and the baseline evaluate successfully.
 - Each evaluation writes a valid `results.json` to the project root.
-- The resulting scores are valid and directly comparable.
+- The resulting scores and metrics are valid and directly comparable.
 - Evaluations are sufficiently inexpensive for repeated algorithm discovery.
+- The code and documentation are understandable and easy to modify.
 
 Keep the implementation plan focused on the smallest complete working system.
 
@@ -298,9 +435,18 @@ system suitable for rapid algorithm discovery.
 The plan must be concrete enough for a coding agent to execute without
 redesigning the environment, while avoiding unnecessary implementation details.
 
-Standardize the evaluation interface and results, not the execution mechanism.
+Maintain clear separation between:
 
-Favor small, readable codebases, minimal dependencies, and fast evaluations.
+- Preparation: Generate shared experimental data and resources once.
+- Algorithms: Transform experimental inputs into output files.
+- Evaluation: Validate outputs, compute metrics, and produce results.json.
+
+Standardize the algorithm interface and evaluation results, not the internal
+execution mechanism.
+
+Favor small, readable codebases, clear documentation, minimal dependencies,
+and fast evaluations.
+
 Avoid complex software systems, excessive infrastructure, and unnecessary
 abstractions.
 
