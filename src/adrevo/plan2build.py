@@ -182,11 +182,11 @@ The goal is to produce a concrete implementation plan for the smallest
 effective evaluation harness that can execute the experiment, measure the
 proposed improvement, and support rapid discovery of improved algorithms.
 
-Make the scientific and engineering decisions needed for a coding agent to
-build and validate the complete environment.
+Make the essential engineering decisions needed for a coding agent to
+build and validate the environment.
 
-Prioritize small, self-contained implementations and inexpensive repeated
-evaluations. Avoid unnecessary software complexity and infrastructure.
+Simplicity is a primary design requirement. Favor small, readable
+implementations, minimal dependencies, and inexpensive repeated evaluations.
 
 ## Scoring system
 
@@ -201,14 +201,10 @@ Specify:
 - How incorrect, invalid, or failed implementations are scored.
 - Why the score captures meaningful progress toward the research thesis.
 
-The score must distinguish genuine algorithmic improvements from artifacts
-while preserving the important tradeoffs identified in the experiment.
+All primary and secondary metrics must be reported independently in
+`results.json`, even when they are not included in `combined_score`.
 
-All primary and secondary metrics must be computed and reported independently
-in `results.json`, even when they are not included in `combined_score`.
-
-Keep scoring computationally inexpensive and suitable for repeated evaluations
-during algorithm discovery.
+Keep scoring simple, scientifically meaningful, and inexpensive to compute.
 
 ## What needs to be built
 
@@ -237,26 +233,36 @@ Replace baseline_method with the name of the selected baseline algorithm.
 The initial algorithm may use the baseline implementation as its starting
 point. Do not design a new algorithm as part of the evaluation environment.
 
-Prefer concise, readable implementations with minimal dependencies.
-Avoid reproducing large software systems when the essential algorithm
-can be implemented independently.
+Use Python in `prepare.py` and `evaluate.py` to orchestrate all preparation,
+building, execution, and evaluation.
+
+Algorithms may be implemented in any suitable programming language,
+including Python, C, C++, Rust, or CUDA.
+
+Choose the simplest language that meets the experiment's computational
+requirements. Use compiled or accelerated languages when performance matters.
+
+Do not introduce shell scripts, Makefiles, task runners, orchestration
+frameworks, or unnecessary helper modules. Keep orchestration in the two
+Python files.
+
+Prefer simple functions over classes and abstractions unless clearly needed.
 
 ## Preparation
 
-Design `prepare.py` to perform one-time preparation when needed:
+Design `prepare.py` to perform one-time preparation:
 
     uv run prepare.py
 
 Preparation may include downloading or generating datasets, preprocessing
-inputs, constructing reference data, or preparing other shared resources.
+inputs, or constructing reference data.
 
-Prepared resources must be stored in `data/` and reused across evaluations.
+Store prepared resources in `data/` and reuse them across evaluations.
 
-Preparation must be separate from evaluation and must not be repeated for
-each algorithm or evaluation run.
+Preparation must not be repeated by `evaluate.py`.
 
-Specify the exact preparation steps, generated files, and procedures needed
-to ensure reproducibility.
+Specify the exact preparation steps and resulting files. Keep preparation
+simple and reproducible.
 
 ## Algorithm interface
 
@@ -270,19 +276,28 @@ Each algorithm must:
 
 Specify the exact input and output formats, invocation method, and file paths.
 
-The interface must be identical for the initial algorithm and baseline.
+Use the simplest practical interface. Prefer files and command-line arguments
+over custom APIs, services, or communication frameworks.
+
+The interface must be identical for the initial algorithm and baseline,
+regardless of their implementation language.
 
 Algorithms must not compute their own evaluation metrics or `combined_score`.
 They only produce outputs from the provided inputs.
 
-The evaluator must independently read these output files, validate correctness,
-and compute all metrics.
+The evaluator independently reads these outputs, validates correctness,
+and computes all metrics.
 
-Keep algorithms independent of evaluation logic, validation rules, and scoring.
-New algorithms should be evaluable without modifying `evaluate.py`.
+New algorithms must be evaluable without modifying the evaluator.
 
-The interface should support different programming languages and execution
-environments without introducing unnecessary abstractions.
+Choose implementation languages based on the experiment. Do not force
+algorithms into Python when compiled or GPU-accelerated implementations
+would be more appropriate.
+
+Each algorithm directory should contain its source code and any dependencies
+or build configuration genuinely required by its implementation.
+
+Keep algorithm implementations focused, self-contained, and easy to modify.
 
 ## Evaluation interface
 
@@ -298,18 +313,24 @@ For example:
 Given an implementation directory, the evaluator:
 
 1. Loads the prepared experimental inputs from `data/`.
-2. Prepares the algorithm's execution environment if needed.
+2. Builds or prepares the algorithm's execution environment if needed.
 3. Executes the algorithm with the required inputs and output file path.
 4. Reads the algorithm's output file.
 5. Validates correctness and computes all evaluation metrics.
 6. Writes `results.json` to the project root, alongside `evaluate.py`.
 
-The evaluator must not repeat the one-time preparation performed by
-`prepare.py`.
+Use Python to manage the entire evaluation lifecycle, including compilation,
+execution, and collection of outputs.
 
-Algorithm outputs and intermediate artifacts must remain separate from
-evaluation results. Use fresh output paths to prevent stale or overlapping
-results.
+For compiled algorithms, `evaluate.py` may invoke compilers and executables
+directly using Python subprocesses. Do not introduce separate build or
+execution scripts.
+
+Keep compilation and setup overhead separate from measured algorithm
+execution time unless the experiment explicitly requires otherwise.
+
+Keep intermediate algorithm outputs separate from evaluation results.
+Prevent stale outputs from affecting subsequent evaluations.
 
 The output contract is:
 
@@ -318,8 +339,7 @@ The output contract is:
         "error": null,
         "combined_score": 0.85,
         "accuracy": 0.92,
-        "runtime_seconds": 1.42,
-        "memory_mb": 128.5
+        "runtime_seconds": 1.42
     }
 
 The metrics above are illustrative. Use the actual primary and secondary
@@ -330,125 +350,124 @@ metrics defined by the experiment.
 - `combined_score` is a finite numeric value, with higher values being better.
 - Every primary and secondary metric must be included as a separate field.
 - Metrics must use consistent names, definitions, and units across methods.
-- Unavailable metrics should be reported as null rather than misleading values.
+- Unavailable metrics should be reported as null.
 
-Every invocation must produce a fresh `results.json` in the project root,
-regardless of which implementation directory is evaluated. Failed evaluations
-must produce a valid result with a noncompetitive score, never leave stale
-results from a previous run.
+Every invocation must produce a fresh `results.json` in the project root.
+Failed evaluations must produce a valid result with a noncompetitive score,
+never leave stale results from a previous run.
 
-All algorithms must be evaluated using the same criteria and comparable
+All algorithms must use identical evaluation criteria and comparable
 experimental conditions.
 
-The evaluation lifecycle should be efficient enough to execute repeatedly
-across many candidate algorithms. Minimize unnecessary setup, compilation,
-data loading, and infrastructure overhead.
+When measuring performance, ensure fair comparisons through consistent
+hardware, compiler settings, resource limits, and measurement procedures
+where applicable.
+
+Keep evaluation execution simple and inexpensive. Do not design for
+distributed execution, parallel evaluation, or complex resource management
+unless the experiment specifically requires them.
 
 ## Implementation design
 
 Specify the concrete implementation design:
 
-- The files and components to build and their responsibilities.
-- The one-time preparation steps and the data or resources they produce.
-- The common algorithm interface, including exact input and output formats,
-  file paths, and how the evaluator invokes each implementation.
-- The datasets or problem instances required for the experiment and how
-  to obtain or generate them.
+- The files to build and their responsibilities.
+- The one-time preparation steps and generated data.
+- The common algorithm input/output interface and execution command.
 - The selected baseline algorithm and how to implement it faithfully.
-- The dependencies, build procedures, and execution environments.
-- The correctness checks, experimental conditions, and resource budgets.
-- How the evaluator reads algorithm outputs and computes the primary and
-  secondary metrics and `combined_score`.
-- How errors, invalid outputs, and execution failures are handled.
+- The implementation language and dependencies for each algorithm.
+- How Python will build and execute the algorithms when necessary.
+- The correctness checks and experimental conditions.
+- How `evaluate.py` computes each metric and `combined_score`.
+- How failures and invalid outputs are handled.
 
-The evaluator must remain independent of the algorithms being tested.
-New algorithms should be evaluable without changing the evaluation criteria.
+Choose the simplest implementation that satisfies the scientific requirements.
 
-Favor simple algorithms, small datasets, and lightweight execution environments
-where these are sufficient for scientifically meaningful measurements.
+Prefer local execution and lightweight dependencies. Use C++, Rust, CUDA,
+or other high-performance technologies when justified by the experiment.
 
-Use external libraries, Docker, Modal, or other infrastructure only when
-justified by the experiment. Prefer local execution when practical.
+Use Docker, Modal, or other infrastructure only when necessary. Do not add
+general-purpose support for technologies that are not required.
 
-Choose concrete technologies, interfaces, and implementation approaches.
-Do not leave important architectural decisions to the build agent.
+Make concrete engineering choices rather than presenting multiple
+architectural alternatives.
 
 ## Code clarity and documentation
 
-Plan for implementations that are easy for a technically sophisticated reader
-unfamiliar with the specific research area to understand, inspect, and modify.
+Plan for code that a technically sophisticated reader unfamiliar with
+the research area can understand and modify.
 
-Specify how the implementation should:
+Require:
 
-- Use simple, readable code with descriptive names and clear interfaces.
-- Document the purpose, inputs, outputs, and behavior of important functions.
-- Explain non-obvious algorithms, mathematical operations, and assumptions
-  with meaningful comments.
-- Document how each metric is computed and why it matters scientifically.
-- Include a concise README describing preparation, execution, evaluation,
-  and interpretation of results.
-- Keep documentation close to the code it explains.
+- Small, readable functions with descriptive names and clear interfaces.
+- Comments explaining non-obvious algorithms, mathematics, and assumptions.
+- Docstrings or equivalent documentation for important functions.
+- Clear explanations of metric calculations and scientific reasoning.
+- A concise README explaining preparation, evaluation, and interpretation
+  of results.
 
-Comments should explain scientific reasoning and non-obvious behavior,
-not merely restate the code.
+Comments should explain why something is done and how difficult parts work,
+rather than restating obvious code.
 
-Prefer straightforward implementations over clever optimizations or
-unnecessary abstractions. Keep documentation concise but sufficiently
-detailed for someone unfamiliar with the research topic.
+Avoid unnecessary abstractions, excessive boilerplate, and documentation
+that duplicates the implementation.
 
 ## Implementation plan
 
-Provide a clear sequence of steps for building the complete evaluation
-environment.
+Provide a concrete sequence of steps for building the environment.
 
 For each step, specify:
 
-- What files or components must be implemented.
-- The essential implementation details and dependencies.
-- How the completed step should be tested.
+- What needs to be implemented.
+- The essential implementation details.
+- How to verify that it works.
 
-Order the steps so that the environment can be built and validated incrementally.
+Start with the smallest working end-to-end evaluation, then complete
+the baseline, measurements, and validation.
 
-Define the tests, commands, and expected outputs needed to verify that:
+Define the commands and expected results needed to verify that:
 
-- `prepare.py` produces the required shared data and resources.
-- Prepared data can be reused without repeating preparation.
-- Both algorithms accept the same input format and produce valid output files.
-- The evaluator correctly reads algorithm outputs and validates correctness.
-- All primary and secondary metrics are calculated correctly and reported.
-- `combined_score` is calculated correctly from the specified measurements.
-- The baseline algorithm is implemented faithfully.
-- Experimental conditions are fair and reproducible.
-- `new_algorithm/` and the baseline evaluate successfully.
-- Each evaluation writes a valid `results.json` to the project root.
-- The resulting scores and metrics are valid and directly comparable.
-- Evaluations are sufficiently inexpensive for repeated algorithm discovery.
-- The code and documentation are understandable and easy to modify.
+- `prepare.py` correctly prepares the required data.
+- The baseline and initial algorithm accept the same inputs and produce
+  valid output files.
+- The evaluator correctly builds and executes the selected implementation.
+- The evaluator correctly validates algorithm outputs.
+- All primary and secondary metrics are calculated and reported correctly.
+- `combined_score` is calculated correctly.
+- Both algorithms produce comparable, reproducible results.
+- Each evaluation writes a fresh `results.json` to the project root.
+- Evaluations are inexpensive enough for repeated algorithm discovery.
 
-Keep the implementation plan focused on the smallest complete working system.
+Use focused tests and simple verification procedures. Do not introduce
+elaborate testing infrastructure unless necessary.
+
+The implementation plan should be sufficiently concrete for a coding agent
+to execute without making major scientific or architectural decisions.
 
 ## Guiding principles
 
-Prioritize a scientifically trustworthy, simple, and efficient evaluation
-system suitable for rapid algorithm discovery.
+Prioritize scientific validity, simplicity, readability, and reproducibility.
 
-The plan must be concrete enough for a coding agent to execute without
-redesigning the environment, while avoiding unnecessary implementation details.
+The environment should consist of the smallest amount of code needed to
+faithfully execute the experiment and measure algorithmic improvements.
 
-Maintain clear separation between:
+Maintain a clear separation between:
 
-- Preparation: Generate shared experimental data and resources once.
+- Preparation: Generate shared experimental data once.
 - Algorithms: Transform experimental inputs into output files.
-- Evaluation: Validate outputs, compute metrics, and produce results.json.
+- Evaluation: Validate outputs, compute metrics, and write results.json.
 
-Standardize the algorithm interface and evaluation results, not the internal
-execution mechanism.
+Use Python in `prepare.py` and `evaluate.py` for all orchestration, while
+allowing algorithms to use the most appropriate implementation language.
 
-Favor small, readable codebases, clear documentation, minimal dependencies,
-and fast evaluations.
+Standardize the algorithm interface and evaluation results, not the
+internal execution mechanism.
 
-Avoid complex software systems, excessive infrastructure, and unnecessary
+Avoid additional scripts, frameworks, infrastructure, and unnecessary
 abstractions.
+
+Prefer a straightforward implementation that is easy to understand and
+debug over a more general or sophisticated architecture.
 
 Preserve the scientific objectives of `RESEARCH_PLAN.md`. If a requirement
 cannot be implemented faithfully within a small research environment,
