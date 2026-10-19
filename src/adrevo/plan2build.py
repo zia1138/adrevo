@@ -483,200 +483,146 @@ as the specification for the build step.
 
 build_prompt = textwrap.dedent("""\
 Build a complete, scientifically trustworthy research evaluation
-harness following the specification in `EVAL_PLAN.md`.
+environment following the specification in `EVAL_PLAN.md`.
 
 Read `EVAL_PLAN.md`, `RESEARCH_PLAN.md`, and inspect the existing code
 before making changes.
 
-Treat `EVAL_PLAN.md` as authoritative for the evaluation architecture,
-algorithm interfaces, baseline implementation, experimental conditions,
-metrics, and scientific requirements.
+Treat `EVAL_PLAN.md` as authoritative for the architecture, interfaces,
+algorithms, experimental conditions, measurements, and scoring.
 
-The objective is a small, working, reproducible evaluation environment
-that executes the selected experiment, evaluates the baseline and initial
-algorithm, and provides a reliable optimization signal for discovering
-improved algorithms.
+The goal is to implement and verify the smallest working environment
+capable of executing the selected experiment and reliably measuring
+algorithmic improvements.
 
-Prioritize simplicity, correctness, and inexpensive repeated evaluations.
+Prioritize scientific correctness, simplicity, readability, and
+inexpensive repeated evaluations.
 
-## Development Process
+## Development process
 
 Follow the implementation plan in `EVAL_PLAN.md`.
 
-Develop incrementally, starting with the smallest functioning end-to-end
-evaluation, then implementing and validating the baseline, experimental
-inputs, correctness checks, and metrics.
+Work autonomously through implementation, testing, debugging, and
+experimental verification.
 
-For each substantial component, determine how its correctness will
-be verified before implementing it.
-
-Work autonomously through the implementation:
-
-- Organize the work into independently verifiable milestones.
+- Start with the smallest functioning end-to-end evaluation.
+- Implement incrementally, using independently verifiable milestones.
+- Determine how to verify each substantial component before implementing it.
 - Run relevant tests and verification commands after each milestone.
 - Diagnose and resolve failures before proceeding.
-- Record completed work, verification evidence, and unresolved issues.
-- Adjust implementation details as necessary while preserving the plan.
+- Maintain a working system throughout development.
+- Track completed work, verification evidence, and unresolved issues.
 
-Maintain a working system throughout development.
+Exercise independent engineering judgment over implementation details,
+but do not redefine the experiment, baseline, interfaces, or scoring.
 
-Exercise independent engineering judgment, but do not redefine the
-scientific experiment, baseline, interfaces, or evaluation criteria.
+If the plan contains inconsistencies or infeasible requirements, document
+them and make only the smallest scientifically defensible adjustments.
+Do not silently change the scientific objectives.
 
-Document any inconsistencies, infeasible requirements, or proposed
-scientific changes for human review.
+## Implementation requirements
 
-## Evaluation Architecture
+Implement the architecture and interfaces specified in `EVAL_PLAN.md`.
 
-Implement the evaluation architecture and interfaces specified in
-`EVAL_PLAN.md`.
+Keep the implementation as simple as possible:
 
-The environment uses a single `evaluate.py` with a Typer CLI:
+- Use Python in `prepare.py` and `evaluate.py` for all orchestration.
+- Allow algorithms to use the programming languages specified in the plan.
+- Avoid unnecessary scripts, frameworks, dependencies, and abstractions.
+- Prefer small functions, straightforward control flow, and readable code.
+- Use descriptive names and meaningful comments explaining non-obvious
+  algorithms, mathematical operations, and scientific reasoning.
+- Document important interfaces, assumptions, and metric calculations.
+
+Implement the specified file-based boundary between algorithms and the
+evaluator. Algorithms produce output files; the evaluator independently
+validates those outputs and computes the metrics.
+
+Preserve the evaluation contract:
 
     uv run evaluate.py run <implementation_directory>
 
-Each algorithm resides in an independent, self-contained directory.
+Each invocation must produce a fresh `results.json` in the project root,
+containing `correct`, `error`, `combined_score`, and all primary and
+secondary metrics specified in the plan.
 
-Given an implementation directory, the evaluator must:
+Keep one-time data preparation separate from repeated evaluations.
 
-1. Prepare the required execution environment.
-2. Execute the implementation.
-3. Collect its outputs and artifacts.
-4. Validate correctness and problem constraints.
-5. Compute the specified metrics.
-6. Write `results.json` to the project root, alongside `evaluate.py`.
+Do not introduce additional experiments, baselines, or infrastructure
+beyond what the plan requires.
 
-The results must follow this contract:
+## Scientific verification
 
-    {
-        "correct": true,
-        "error": null,
-        "combined_score": 0.85
-    }
+Verify the evaluator independently rather than relying only on successful
+end-to-end execution.
 
-- `correct` indicates whether the implementation passed validation.
-- `error` describes an evaluation failure, or is null on success.
-- `combined_score` is a finite numeric value, with higher values being better.
-- Additional diagnostic metrics may be included when useful.
+Establish that:
 
-Every invocation must produce a fresh `results.json` in the project root.
-Failed evaluations must produce a valid result with a noncompetitive score,
-never leave stale results from a previous invocation.
+- Correctness checks accept valid outputs and reject invalid outputs.
+- Primary and secondary metrics are calculated correctly.
+- `combined_score` is calculated correctly from the specified measurements.
+- Invalid or failed implementations receive noncompetitive scores.
+- The baseline faithfully implements the selected algorithm.
+- All implementations are evaluated under fair, comparable conditions.
+- Measurements are reproducible within appropriate tolerances.
 
-The evaluator owns the complete execution lifecycle.
+Use known results, simple reference cases, and positive and negative
+controls where appropriate.
 
-Implement the algorithm input/output contract, measurements, scoring,
-and results format as specified in `EVAL_PLAN.md`.
+Investigate unexpected results rather than modifying evaluation criteria
+to accommodate them.
 
-All implementations must use the same validation rules, scoring
-criteria, and comparable experimental conditions.
+Ensure the evaluation measures genuine algorithmic differences rather
+than implementation artifacts or weaknesses in the evaluator.
 
-Keep evaluation logic independent of implementation code.
-Implementations must not control validation or scoring.
+## End-to-end validation
 
-Support the implementation languages and execution environments
-required by the plan, without introducing unnecessary infrastructure.
+Run the complete evaluation from a clean state.
 
-Standardize inputs and outputs, not internal execution mechanisms.
+Verify that:
 
-Handle build failures, timeouts, execution errors, and invalid
-outputs robustly.
-
-Keep the architecture simple. Avoid unnecessary frameworks,
-abstractions, dependencies, or infrastructure.
-
-## Scientific Verification
-
-Use verification to drive development.
-
-Verify the evaluator independently using known results, reference
-implementations, and positive and negative controls where appropriate.
-
-Demonstrate that the evaluator:
-
-- Accepts valid algorithm outputs.
-- Rejects invalid outputs.
-- Computes the specified metrics and combined_score correctly.
-- Applies consistent criteria to every implementation.
-- Produces reproducible measurements under controlled conditions.
-
-Validate the baseline against known results or independent
-correctness checks where available.
-
-Investigate unexpected results rather than modifying evaluation
-criteria to accommodate them.
-
-Ensure the scoring system rewards genuine algorithmic improvements
-rather than experimental artifacts.
-
-## Experimental Validation
-
-Run the evaluator on the selected baseline and the initial
-implementation in `new_algorithm/`.
+- `prepare.py` produces the required reusable experimental data.
+- The baseline and `new_algorithm/` execute successfully.
+- Both follow the same algorithm input/output contract.
+- Each evaluation produces a valid root-level `results.json`.
+- All specified measurements are present and directly comparable.
+- New implementation directories can be evaluated without modifying
+  the evaluator.
+- Evaluation time and resource usage are practical for repeated runs.
 
 The initial implementation may use the baseline as its starting point.
 Do not invent a new algorithm as part of building the environment.
 
-Collect and compare the measurements according to `EVAL_PLAN.md`.
+Document the commands required to reproduce the experiment and interpret
+the results.
 
-Verify that:
+## Completion criteria
 
-- Both implementations execute successfully.
-- Each evaluation produces a valid root-level `results.json`.
-- The measured scores are meaningful and directly comparable.
-- Results are reproducible under the specified experimental conditions.
-- Evaluation time and resource requirements are practical for repeated
-  algorithm discovery.
+The work is complete when the environment specified in `EVAL_PLAN.md`
+has been implemented and independently verified.
 
-Demonstrate that another implementation directory can be evaluated
-without modifying the evaluator.
+Report:
 
-Verify the complete evaluation from a clean state using documented commands.
-
-## Completion Criteria
-
-The work is complete when the evaluation environment specified in
-`EVAL_PLAN.md` has been implemented, verified, and demonstrated.
-
-At minimum:
-
-- The evaluation CLI works end to end.
-- The selected baseline is implemented faithfully.
-- The initial algorithm in `new_algorithm/` evaluates successfully.
-- Both implementations satisfy the specified input/output contract.
-- Correctness checks and metrics have been independently validated.
-- Every evaluation writes a valid `results.json` to the project root.
-- The scores are correct, comparable, and reproducible.
-- The evaluator can evaluate new implementations without modification.
-- The environment is sufficiently lightweight for repeated evaluations.
-
-Report the measured results, verification evidence, discrepancies
-with previous work, and remaining limitations.
+- What was implemented.
+- The commands used for verification.
+- The measured results for the baseline and initial algorithm.
+- Evidence that the evaluator and scoring are correct.
+- Any discrepancies, unresolved issues, or scientific limitations.
 
 If completion is blocked, document the blocker and preserve the
 verified partial implementation.
 
-## Guiding Principles
+## Guiding principles
 
-Prioritize scientific correctness, simplicity, and reproducibility.
+The goal is a small, understandable, scientifically trustworthy
+research environment, not a general-purpose evaluation framework.
 
-Build the smallest complete system that faithfully implements the
-experiment in `EVAL_PLAN.md`.
+Prioritize correctness and reproducibility without unnecessary complexity.
 
-Favor concise, readable code, minimal dependencies, and fast evaluations.
+Take ownership of implementation, debugging, and verification while
+preserving the scientific requirements in `EVAL_PLAN.md`.
 
-Do not introduce additional experiments, baselines, or infrastructure
-beyond what is required by the plan.
-
-Maintain a working system throughout development.
-
-Take ownership of the entire engineering and verification process.
-
-Preserve the scientific specification while exercising independent
-judgment over routine implementation decisions.
-
-The deliverable is not merely working code. It is a small, verified
-research environment capable of reliably measuring improvements
-in new algorithms.
+The deliverable is not merely working code. It is a verified research
+environment that can reliably evaluate new algorithms.
 """)    
 
