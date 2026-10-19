@@ -233,18 +233,27 @@ Replace baseline_method with the name of the selected baseline algorithm.
 The initial algorithm may use the baseline implementation as its starting
 point. Do not design a new algorithm as part of the evaluation environment.
 
-Use Python in `prepare.py` and `evaluate.py` to orchestrate all preparation,
-building, execution, and evaluation.
+Use Python in `prepare.py` and `evaluate.py` for orchestration.
 
-Algorithms may be implemented in any suitable programming language,
+Computationally intensive work may use any suitable programming language,
 including Python, C, C++, Rust, or CUDA.
 
-Choose the simplest language that meets the experiment's computational
-requirements. Use compiled or accelerated languages when performance matters.
+Keep performance-critical implementations in separate source files rather
+than embedding them in `prepare.py` or `evaluate.py`.
+
+For example, preparation may use a separate `prepare_native.cpp`, while
+algorithm implementations reside in their respective method directories.
+Additional source files are permitted when needed for computational work.
+
+The Python entry points should directly build and invoke these implementations
+using subprocesses or simple bindings.
+
+Do not embed native source code as Python strings or generate source files
+dynamically when ordinary source files would suffice.
 
 Do not introduce shell scripts, Makefiles, task runners, orchestration
-frameworks, or unnecessary helper modules. Keep orchestration in the two
-Python files.
+frameworks, or unnecessary helper modules. Keep orchestration in
+`prepare.py` and `evaluate.py`.
 
 Prefer simple functions over classes and abstractions unless clearly needed.
 
@@ -257,12 +266,21 @@ Design `prepare.py` to perform one-time preparation:
 Preparation may include downloading or generating datasets, preprocessing
 inputs, or constructing reference data.
 
+Use Python for orchestration and lightweight operations. When preparation
+requires substantial computation, use separate source files implemented
+in C++, Rust, CUDA, or another suitable language.
+
+`prepare.py` should directly compile and execute these implementations
+when needed, without additional orchestration scripts.
+
 Store prepared resources in `data/` and reuse them across evaluations.
 
 Preparation must not be repeated by `evaluate.py`.
 
-Specify the exact preparation steps and resulting files. Keep preparation
-simple and reproducible.
+Specify the exact preparation steps, implementation languages, source files,
+dependencies, and resulting data files.
+
+Keep preparation simple, reproducible, and easy to understand.
 
 ## Algorithm interface
 
@@ -319,12 +337,19 @@ Given an implementation directory, the evaluator:
 5. Validates correctness and computes all evaluation metrics.
 6. Writes `results.json` to the project root, alongside `evaluate.py`.
 
-Use Python to manage the entire evaluation lifecycle, including compilation,
-execution, and collection of outputs.
+Use Python to manage the evaluation lifecycle, including compilation,
+execution, output collection, validation, and scoring.
 
-For compiled algorithms, `evaluate.py` may invoke compilers and executables
-directly using Python subprocesses. Do not introduce separate build or
-execution scripts.
+Keep straightforward validation and metric calculations in Python.
+If a measurement requires substantial computation, implement that computation
+in a separate source file and invoke it from `evaluate.py`.
+
+Do not embed computational kernels, native source code, or complex
+algorithm implementations directly in `evaluate.py`.
+
+For compiled implementations, invoke compilers and executables directly
+using Python subprocesses or simple bindings. Do not introduce separate
+build or execution scripts.
 
 Keep compilation and setup overhead separate from measured algorithm
 execution time unless the experiment explicitly requires otherwise.
@@ -375,8 +400,9 @@ Specify the concrete implementation design:
 - The one-time preparation steps and generated data.
 - The common algorithm input/output interface and execution command.
 - The selected baseline algorithm and how to implement it faithfully.
-- The implementation language and dependencies for each algorithm.
-- How Python will build and execute the algorithms when necessary.
+- The implementation languages and dependencies for preparation and algorithms.
+- Which computational components require separate high-performance source files.
+- How Python will compile and invoke those components when necessary.
 - The correctness checks and experimental conditions.
 - How `evaluate.py` computes each metric and `combined_score`.
 - How failures and invalid outputs are handled.
@@ -385,6 +411,10 @@ Choose the simplest implementation that satisfies the scientific requirements.
 
 Prefer local execution and lightweight dependencies. Use C++, Rust, CUDA,
 or other high-performance technologies when justified by the experiment.
+
+Keep computational implementations in ordinary, independently readable
+source files. Keep Python orchestration concise and separate from
+performance-critical code.
 
 Use Docker, Modal, or other infrastructure only when necessary. Do not add
 general-purpose support for technologies that are not required.
@@ -405,6 +435,9 @@ Require:
 - Clear explanations of metric calculations and scientific reasoning.
 - A concise README explaining preparation, evaluation, and interpretation
   of results.
+
+Keep orchestration, computational implementations, and evaluation logic
+clearly separated so each can be understood independently.
 
 Comments should explain why something is done and how difficult parts work,
 rather than restating obvious code.
@@ -428,6 +461,7 @@ the baseline, measurements, and validation.
 Define the commands and expected results needed to verify that:
 
 - `prepare.py` correctly prepares the required data.
+- Any native preparation or evaluation components build and execute correctly.
 - The baseline and initial algorithm accept the same inputs and produce
   valid output files.
 - The evaluator correctly builds and executes the selected implementation.
@@ -457,14 +491,20 @@ Maintain a clear separation between:
 - Algorithms: Transform experimental inputs into output files.
 - Evaluation: Validate outputs, compute metrics, and write results.json.
 
-Use Python in `prepare.py` and `evaluate.py` for all orchestration, while
-allowing algorithms to use the most appropriate implementation language.
+Use Python in `prepare.py` and `evaluate.py` for orchestration and
+straightforward computations.
+
+Keep substantial computational work in separate source files, using
+the most appropriate implementation language.
+
+Do not inline high-performance kernels or native implementations in
+the Python orchestration files.
 
 Standardize the algorithm interface and evaluation results, not the
 internal execution mechanism.
 
-Avoid additional scripts, frameworks, infrastructure, and unnecessary
-abstractions.
+Avoid additional orchestration scripts, frameworks, infrastructure,
+and unnecessary abstractions.
 
 Prefer a straightforward implementation that is easy to understand and
 debug over a more general or sophisticated architecture.
