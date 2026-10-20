@@ -200,8 +200,7 @@ def build(
         files_to_extract=selected_files,
     )
 
-    build_instructions = build_prompt.replace("PLAN.md", selected_plan_name)
-    (results_path / "BUILD.md").write_text(build_instructions, encoding="utf-8")
+    (results_path / "BUILD.md").write_text(build_prompt, encoding="utf-8")
 
     typer.echo()
     typer.secho("Build workspace is ready.", fg=typer.colors.GREEN, bold=True)
