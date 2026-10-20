@@ -58,7 +58,10 @@ def get_adrevo_config():
             ])
             instructions = (output / "instruction.md").read_text()
             self.assertIn("Multiply matrices.", instructions)
-            self.assertIn("uv run -qq --project . python evaluate_local.py", instructions)
+            self.assertIn(
+                "uv run -qq --project . python evaluate_local.py run evo",
+                instructions,
+            )
             self.assertIn("Continue until you believe you have achieved a good solution", instructions)
             self.assertNotIn("Harbor", instructions)
             self.assertIn("--disable-verification", result.output)

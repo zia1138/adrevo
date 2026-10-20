@@ -827,6 +827,7 @@ class AdrevoWorker:
             parent_zip_bytes=context.current_zip_bytes,
             file_replacements=file_replacements,
             evaluator_file=self.evo_config.evaluate_file,
+            evo_dir=self.evo_config.evo_dir,
             evaluator_timeout_sec=self.evo_config.evaluator_timeout_sec,
             evaluator_termination_grace_sec=(
                 self.evo_config.evaluator_termination_grace_sec
@@ -907,6 +908,7 @@ class AdrevoWorker:
             parent_zip_bytes=context.current_zip_bytes,
             file_replacements=file_replacements,
             evaluator_file=self.evo_config.evaluate_file,
+            evo_dir=self.evo_config.evo_dir,
             evaluator_timeout_sec=self.evo_config.evaluator_timeout_sec,
             evaluator_termination_grace_sec=(
                 self.evo_config.evaluator_termination_grace_sec

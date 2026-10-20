@@ -62,6 +62,8 @@ class AdrevoConfig:
         fixed_files: Project files relevant to the candidate files, shown in the
             initial model prompt as read-only context. They cannot be modified.
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
+        evo_dir: Project-relative implementation directory passed to the evaluator.
+            Default is evo.
         evaluator_timeout_sec: Maximum seconds for trusted evaluate.py to run.
             Set to None to disable the timeout.
         evaluator_termination_grace_sec: Seconds to wait after sending SIGTERM
@@ -86,7 +88,8 @@ class AdrevoConfig:
         AdrevoFile(file="evo/main.py", lang_identifier="python"),
         AdrevoFile(file="evo/pyproject.toml", lang_identifier="toml")
     )
-    evaluate_file: str = "evaluate.py"  # TODO: Remove hard coding of evaluate.py in codebase.
+    evaluate_file: str = "evaluate.py"
+    evo_dir: str = "evo"
     evaluator_timeout_sec: int | None = 10 * 60
     evaluator_termination_grace_sec: int = 30
     use_probe: bool = True
@@ -133,14 +136,19 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
         raise ValueError("AdrevoConfig.use_probe must be a boolean")
     if not isinstance(cfg.evolvable_files, tuple) or not cfg.evolvable_files:
         raise ValueError("AdrevoConfig.evolvable_files must be a non-empty tuple")
+    _validate_relative_path(cfg.evo_dir, "AdrevoConfig.evo_dir")
+    evo_dir = Path(cfg.evo_dir)
     seen_evolvable_files: set[str] = set()
     for index, evolvable_file in enumerate(cfg.evolvable_files):
         field_name = f"AdrevoConfig.evolvable_files[{index}]"
         if not isinstance(evolvable_file, AdrevoFile):
             raise ValueError(f"{field_name} must be an AdrevoFile")
         _validate_relative_path(evolvable_file.file, f"{field_name}.file")
-        if Path(evolvable_file.file).parts[0] != "evo":
-            raise ValueError(f"{field_name}.file must be inside evo/: {evolvable_file.file}")
+        if not Path(evolvable_file.file).is_relative_to(evo_dir):
+            raise ValueError(
+                f"{field_name}.file must be inside {cfg.evo_dir}/: "
+                f"{evolvable_file.file}"
+            )
         if (
             not isinstance(evolvable_file.lang_identifier, str)
             or not evolvable_file.lang_identifier.strip()

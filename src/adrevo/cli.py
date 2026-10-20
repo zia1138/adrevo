@@ -557,10 +557,12 @@ def harbor(
     evaluate_path = Path(evaluate)
     if evaluate_path.is_absolute() or ".." in evaluate_path.parts:
         raise typer.BadParameter("Evaluate must be a project-relative path without '..'.")
+    evo_path = Path(cfg.evo_dir)
+    evo_dir = evo_path.as_posix()
     required = (evaluate_path, Path("pyproject.toml"))
     missing = [path for path in required if not (project / path).is_file()]
-    if not (project / "evo").is_dir():
-        missing.append(Path("evo"))
+    if not (project / evo_path).is_dir():
+        missing.append(evo_path)
     if missing:
         raise typer.BadParameter(
             "Required files missing: " + ", ".join(sorted(map(str, missing)))
@@ -568,30 +570,32 @@ def harbor(
     task_config = (
         'schema_version = "1.3"\n\n'
         'artifacts = [\n'
-        '    { source = "/app/evo", destination = "evo" },\n'
+        f'    {{ source = "/app/{evo_dir}", destination = "{evo_dir}" }},\n'
         f"]\n\n[agent]\ntimeout_sec = {agent_timeout_sec}\n"
     )
     score_goal = "maximize" if cfg.maximize_combined_score else "minimize"
     score_comparison = "higher" if cfg.maximize_combined_score else "lower"
     score_superlative = "highest" if cfg.maximize_combined_score else "lowest"
     development_instructions = (
-        "Work in `/app` and improve the solution in `evo/`. First inspect the evaluator "
+        f"Work in `/app` and improve the solution in `{evo_dir}/`. First inspect the evaluator "
         "to understand the requirements, constraints, and scoring. Preserve the solution's "
         f"input/output contract, keep `correct` true, and {score_goal} `combined_score`.\n\n"
         "Iterate on the solution: make an improvement, run the evaluator, inspect the result, "
         "and use what you learn for the next improvement. Continue until you believe you have "
         "achieved a good solution and further changes are unlikely to help.\n\n"
-        f"Keep your best verified, {score_superlative}-scoring valid solution in `/app/evo/main.py`. "
+        f"Keep your best verified, {score_superlative}-scoring valid solution in "
+        f"`/app/{evo_dir}/main.py`. "
         "Try experimental changes in separate working copies, and replace the stored best "
         f"solution only after evaluation confirms a {score_comparison} `combined_score` with `correct` true. "
-        "Keep its supporting files and dependencies in `evo/` consistent with that solution. "
-        "The `evo/` directory is collected when execution ends, including on timeout, so it "
+        f"Keep its supporting files and dependencies in `{evo_dir}/` consistent with that solution. "
+        f"The `{evo_dir}/` directory is collected when execution ends, including on timeout, so it "
         "must contain your best solution rather than your latest unverified experiment.\n\n"
         "Run the evaluator with:\n\n```bash\ncd /app\n"
-        f"rm -f results.json\nuv run -qq --project . python {evaluate_path.as_posix()}\n"
+        f"rm -f results.json\nuv run -qq --project . python "
+        f"{shlex.quote(evaluate_path.as_posix())} run {shlex.quote(evo_dir)}\n"
         "cat results.json\n```\n\n"
-        "A failed evaluation is not a valid result. Keep all final solution changes inside "
-        "`evo/`, and declare any solution dependencies in `evo/pyproject.toml`. Do not rely "
+        f"A failed evaluation is not a valid result. Keep all final solution changes inside "
+        f"`{evo_dir}/`, and declare any solution dependencies in `{evo_dir}/pyproject.toml`. Do not rely "
         "on changes to the evaluator or baseline.\n"
     )
     instructions = (
