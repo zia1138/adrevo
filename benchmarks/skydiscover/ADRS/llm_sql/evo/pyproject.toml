@@ -2,4 +2,4 @@
 name = "llm-sql-candidate"
 version = "0.1.0"
 requires-python = ">=3.13"
-dependencies = ["networkx>=3.6.1", "pandas<3", "typer>=0.12.0"]
+dependencies = ["networkx>=3.6.1", "pandas<3"]
