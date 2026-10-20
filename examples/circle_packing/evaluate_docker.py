@@ -6,12 +6,19 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import typer
 
 
 RUNNER_IMAGE = "ghcr.io/astral-sh/uv:python3.13-trixie-slim"
 CONTAINER_TERMINATION_GRACE_SEC = 10
 N = 26
-OUTPUT_FILE = Path("evo/circle_packing.json")
+
+app = typer.Typer()
+
+
+@app.callback()
+def main() -> None:
+    """Evaluate circle-packing implementations in Docker."""
 
 
 class EvaluatorTerminated(SystemExit):
@@ -53,10 +60,10 @@ def validate_packing(centers, radii, atol=1e-10):
     return True, None
 
 
-def run_candidate() -> str:
+def run_candidate(evo_dir: Path, output_file: Path) -> str:
     """Run the candidate in a fresh Docker container."""
     container = None
-    OUTPUT_FILE.unlink(missing_ok=True)
+    output_file.unlink(missing_ok=True)
     previous_sigterm_handler = signal.signal(signal.SIGTERM, _handle_sigterm)
     try:
         container = subprocess.check_output(
@@ -74,13 +81,21 @@ def run_candidate() -> str:
             ],
             text=True,
         ).strip()
-        subprocess.run(["docker", "cp", "evo", f"{container}:/"], check=True)
-        subprocess.run(["docker", "start", "-a", container], check=True)
         subprocess.run(
-            ["docker", "cp", f"{container}:/evo/circle_packing.json", OUTPUT_FILE],
+            ["docker", "cp", str(evo_dir), f"{container}:/evo"],
             check=True,
         )
-        return OUTPUT_FILE.read_text(encoding="utf-8")
+        subprocess.run(["docker", "start", "-a", container], check=True)
+        subprocess.run(
+            [
+                "docker",
+                "cp",
+                f"{container}:/evo/circle_packing.json",
+                str(output_file),
+            ],
+            check=True,
+        )
+        return output_file.read_text(encoding="utf-8")
     finally:
         if container is not None:
             subprocess.run(
@@ -102,9 +117,21 @@ def run_candidate() -> str:
         signal.signal(signal.SIGTERM, previous_sigterm_handler)
 
 
-def main() -> None:
+@app.command()
+def run(
+    evo_dir: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        help="Directory containing the circle-packing implementation.",
+    ),
+) -> None:
+    """Run and evaluate a circle-packing implementation in Docker."""
+    output_file = evo_dir / "circle_packing.json"
     try:
-        output_text = run_candidate()
+        output_text = run_candidate(evo_dir, output_file)
         payload = json.loads(output_text)
         is_valid, error_msg = validate_packing(
             payload["centers"], payload["radii"]
@@ -121,4 +148,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()

@@ -2,13 +2,19 @@
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import numpy as np
+import typer
 
 N = 26
-OUTPUT_FILE = Path("evo/circle_packing.json")
+
+app = typer.Typer()
+
+
+@app.callback()
+def main() -> None:
+    """Evaluate circle-packing implementations."""
 
 
 def validate_packing(centers, radii, atol=1e-10):
@@ -46,15 +52,35 @@ def validate_packing(centers, radii, atol=1e-10):
     return True, None
 
 
-if __name__ == "__main__":
+@app.command()
+def run(
+    evo_dir: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        help="Directory containing the circle-packing implementation.",
+    ),
+) -> None:
+    """Run and evaluate a circle-packing implementation."""
+    output_file = evo_dir / "circle_packing.json"
     try:
-        OUTPUT_FILE.unlink(missing_ok=True)
+        output_file.unlink(missing_ok=True)
         subprocess.run(
-            ["uv", "run", "-qq", "--directory", "evo", "python", "main.py"],
+            [
+                "uv",
+                "run",
+                "-qq",
+                "--directory",
+                str(evo_dir),
+                "python",
+                "main.py",
+            ],
             check=True,
         )
 
-        payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+        payload = json.loads(output_file.read_text(encoding="utf-8"))
         is_valid, error_msg = validate_packing(
             payload["centers"], payload["radii"]
         )
@@ -72,3 +98,7 @@ if __name__ == "__main__":
         }
 
     Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    app()

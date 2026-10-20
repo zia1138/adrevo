@@ -7,20 +7,17 @@ from pathlib import Path
 
 import modal
 import numpy as np
+import typer
 
 
 N = 26
-OUTPUT_FILE = Path("evo/circle_packing.json")
+
+cli = typer.Typer()
 
 
-app = modal.App("adrevo-circle-packing")
-image = (
-    modal.Image.debian_slim(python_version="3.13")
-    # Build the candidate environment from evo/pyproject.toml.
-    .uv_sync("evo")
-    # copy=True makes /evo writable so main.py can create circle_packing.json.
-    .add_local_dir("evo", remote_path="/evo", copy=True)
-)
+@cli.callback()
+def main() -> None:
+    """Evaluate circle-packing implementations on Modal."""
 
 
 class EvaluatorTerminated(SystemExit):
@@ -66,7 +63,6 @@ def validate_packing(centers, radii, atol=1e-10):
     return True, None
 
 
-@app.function(image=image)
 def run_candidate() -> str:
     """Run the evolved program remotely and return its output file."""
     subprocess.run(
@@ -76,7 +72,27 @@ def run_candidate() -> str:
     return Path("/evo/circle_packing.json").read_text(encoding="utf-8")
 
 
-def main() -> None:
+@cli.command()
+def run(
+    evo_dir: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        help="Directory containing the circle-packing implementation.",
+    ),
+) -> None:
+    """Run and evaluate a circle-packing implementation on Modal."""
+    output_file = evo_dir / "circle_packing.json"
+    app = modal.App("adrevo-circle-packing")
+    image = (
+        modal.Image.debian_slim(python_version="3.13")
+        .uv_sync(str(evo_dir))
+        # copy=True makes /evo writable so main.py can create the output file.
+        .add_local_dir(str(evo_dir), remote_path="/evo", copy=True)
+    )
+    remote_run_candidate = app.function(image=image)(run_candidate)
     call = None
     previous_sigterm_handler = signal.signal(signal.SIGTERM, _handle_sigterm)
     try:
@@ -90,7 +106,7 @@ def main() -> None:
                     call.cancel(terminate_containers=True)
 
         # The trusted evaluator owns the local result used for validation.
-        OUTPUT_FILE.write_text(output_text, encoding="utf-8")
+        output_file.write_text(output_text, encoding="utf-8")
         payload = json.loads(output_text)
         is_valid, error_msg = validate_packing(
             payload["centers"], payload["radii"]
@@ -111,4 +127,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    cli()
