@@ -10,11 +10,20 @@ import tempfile
 import traceback
 import urllib.request
 from pathlib import Path
-from typing import Dict, List
 from types import SimpleNamespace
+from typing import Dict, List
 
 import networkx as nx
 import pandas as pd
+import typer
+
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 _DATASET_VERSION = "cloudcast-v1"
@@ -359,7 +368,8 @@ def canonicalize_paths(bc_t, terminal_nodes, num_partitions, reference_graph):
 
 # ---------- Main evaluation ----------
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
         data_dir = ensure_cloudcast_data()
         config_files = [
@@ -395,8 +405,8 @@ if __name__ == "__main__":
                 terminal_nodes = config["dest_nodes"]
                 num_partitions = config["num_partitions"]
 
-                input_path = Path("evo/input.json")
-                output_path = Path("evo/output.json")
+                input_path = evo_dir / "input.json"
+                output_path = evo_dir / "output.json"
                 output_path.unlink(missing_ok=True)
                 input_path.write_text(json.dumps({
                     "source_node": source_node,
@@ -404,7 +414,10 @@ if __name__ == "__main__":
                     "num_partitions": num_partitions,
                     "edges": [[src, dst, dict(data)] for src, dst, data in reference_graph.edges(data=True)],
                 }), encoding="utf-8")
-                subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
+                subprocess.run(
+                    ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+                    check=True,
+                )
                 candidate_output = json.loads(output_path.read_text(encoding="utf-8"))
                 bc_t = SimpleNamespace(**candidate_output)
 
@@ -466,3 +479,7 @@ if __name__ == "__main__":
         result = {"correct": False, "error": str(e), "combined_score": 0.0}
         with open("results.json", "w") as f:
             json.dump(result, f, indent=4)
+
+
+if __name__ == "__main__":
+    app()

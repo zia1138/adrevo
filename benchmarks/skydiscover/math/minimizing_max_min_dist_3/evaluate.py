@@ -6,15 +6,27 @@ from pathlib import Path
 
 import numpy as np
 import scipy.spatial.distance
+import typer
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 NUM_POINTS = 14
 DIMENSION = 3
-OUTPUT_FILE = Path("evo/minimizing_max_min_dist_3.json")
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
+    output_file = evo_dir / "minimizing_max_min_dist_3.json"
     try:
-        OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
-        points = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["points"]
+        output_file.unlink(missing_ok=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
+        points = json.loads(output_file.read_text(encoding="utf-8"))["points"]
     except Exception as exc:
         Path("results.json").write_text(json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4), encoding="utf-8")
         raise SystemExit
@@ -49,3 +61,7 @@ if __name__ == "__main__":
         "combined_score": combined_score,
     }
     Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    app()

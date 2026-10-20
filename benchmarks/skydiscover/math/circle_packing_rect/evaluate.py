@@ -5,13 +5,20 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import typer
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 NUM_CIRCLES = 21
 TOL = 1e-6
 # If width + height <= 2, then 4r <= 2 for every contained circle.
 MAX_RADIUS = 0.5
-OUTPUT_FILE = Path("evo/circle_packing_rect.json")
 
 
 def _as_float_array(candidate):
@@ -114,11 +121,16 @@ def evaluate_candidate(candidate):
     return True, None, score
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
+    output_file = evo_dir / "circle_packing_rect.json"
     try:
-        OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
-        payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+        output_file.unlink(missing_ok=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
+        payload = json.loads(output_file.read_text(encoding="utf-8"))
         is_valid, error_msg, combined_score = evaluate_candidate(payload["circles"])
     except Exception as exc:
         is_valid = False
@@ -132,3 +144,7 @@ if __name__ == "__main__":
     }
     # Refuse JavaScript's non-standard NaN and Infinity spellings.
     Path("results.json").write_text(json.dumps(result, indent=4, allow_nan=False), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    app()

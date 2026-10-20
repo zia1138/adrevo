@@ -12,6 +12,14 @@ import urllib.request
 from pathlib import Path
 
 import torch
+import typer
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 _DATASET_VERSION = "eplb-v1"
@@ -141,17 +149,21 @@ def simulate_inference(
     return balancedness_gpu, balancedness_expert
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
         workloads = load_workloads(ensure_eplb_data() / _DATASET_FILE)
-        input_path = Path("evo/input.json")
-        output_path = Path("evo/output.json")
+        input_path = evo_dir / "input.json"
+        output_path = evo_dir / "output.json"
         output_path.unlink(missing_ok=True)
         input_path.write_text(json.dumps({
             "workloads": [workload.tolist() for workload in workloads[:-1]],
             "parameters": {"num_replicas": NUM_REPLICAS, "num_groups": NUM_GROUPS, "num_nodes": NUM_NODES, "num_gpus": NUM_GPUS},
         }), encoding="utf-8")
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
         candidate_outputs = json.loads(output_path.read_text(encoding="utf-8"))["outputs"]
         if len(candidate_outputs) != len(workloads) - 1:
             raise ValueError("Candidate returned the wrong number of rebalances")
@@ -224,3 +236,7 @@ if __name__ == "__main__":
 
     with open("results.json", "w") as f:
         json.dump(result, f, indent=4)
+
+
+if __name__ == "__main__":
+    app()

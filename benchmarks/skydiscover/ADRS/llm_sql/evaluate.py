@@ -3,18 +3,26 @@
 import fcntl
 import json
 import shutil
+import subprocess
 import time
 import traceback
 import tempfile
 import urllib.request
-from typing import Tuple
+import warnings
 from collections import Counter
+from pathlib import Path
+from typing import Tuple
 
 import pandas as pd
+import typer
 
-import warnings
-import subprocess
-from pathlib import Path
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
+
 
 warnings.filterwarnings(
     "ignore",
@@ -153,7 +161,8 @@ def validate_output(expected: pd.DataFrame, actual: pd.DataFrame) -> None:
 
 # ---------- Main evaluation ----------
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
         datasets_dir = ensure_llm_sql_data()
 
@@ -173,9 +182,9 @@ if __name__ == "__main__":
             [['product_title', 'parent_asin']],
         ]
 
-        prepared_dir = Path("evo/inputs")
+        prepared_dir = evo_dir / "inputs"
         prepared_dir.mkdir(exist_ok=True)
-        output_dir = Path("evo/outputs")
+        output_dir = evo_dir / "outputs"
         output_dir.mkdir(exist_ok=True)
         expected_frames = []
         requests = []
@@ -193,9 +202,14 @@ if __name__ == "__main__":
                             "row_stop": 4, "col_stop": 2, "col_merge": []},
             })
 
-        Path("evo/input.json").write_text(json.dumps({"requests": requests}), encoding="utf-8")
+        (evo_dir / "input.json").write_text(
+            json.dumps({"requests": requests}), encoding="utf-8"
+        )
         started = time.perf_counter()
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
         total_runtime = time.perf_counter() - started
 
         hit_rates = []
@@ -220,3 +234,7 @@ if __name__ == "__main__":
         result = {"correct": False, "error": str(e), "combined_score": 0.0}
         with open("results.json", "w") as f:
             json.dump(result, f, indent=4)
+
+
+if __name__ == "__main__":
+    app()

@@ -8,8 +8,19 @@ import subprocess
 import tempfile
 import time
 import traceback
+from pathlib import Path
+
+import typer
 
 from workloads import WORKLOAD_1, WORKLOAD_2, WORKLOAD_3
+
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 class TrustedWorkload:
@@ -111,14 +122,14 @@ def validate_schedule(txn_seq, expected_size):
     return set(txn_seq) == set(range(expected_size))
 
 
-def run_with_timeout(timeout_seconds=600):
+def run_with_timeout(evo_dir: Path, timeout_seconds=600):
     """Run the candidate in its own environment and return its JSON artifact."""
-    input_path = os.path.join("evo", "input.json")
-    output_path = os.path.join("evo", "output.json")
+    input_path = evo_dir / "input.json"
+    output_path = evo_dir / "output.json"
     with open(input_path, "w") as f:
         json.dump({"workloads": [WORKLOAD_1, WORKLOAD_2, WORKLOAD_3]}, f)
     subprocess.run(
-        ["uv", "run", "-qq", "--directory", "evo", "python", "main.py"],
+        ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
         check=True,
         timeout=timeout_seconds,
     )
@@ -129,10 +140,11 @@ def run_with_timeout(timeout_seconds=600):
     return results["schedules"]
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
         start_time = time.time()
-        schedules = run_with_timeout(timeout_seconds=600)
+        schedules = run_with_timeout(evo_dir, timeout_seconds=600)
         eval_time = time.time() - start_time
 
         workloads = [
@@ -177,3 +189,7 @@ if __name__ == "__main__":
 
     with open("results.json", "w") as f:
         json.dump(result, f, indent=4)
+
+
+if __name__ == "__main__":
+    app()

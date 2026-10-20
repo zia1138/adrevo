@@ -6,13 +6,19 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import typer
 
 
 N = 26
-CANDIDATE_DIR = Path("evo")
-OUTPUT_FILE = CANDIDATE_DIR / "circle_packing.json"
 CANDIDATE_TIMEOUT_SECONDS = 530
 ATOL = 1e-12
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 def validate_packing(
@@ -55,20 +61,22 @@ def validate_packing(
     return True, None, radii
 
 
-def run_candidate() -> dict[str, Any]:
+def run_candidate(evo_dir: Path) -> dict[str, Any]:
     """Run the candidate in its own uv project and parse its output file."""
-    OUTPUT_FILE.unlink(missing_ok=True)
+    output_file = evo_dir / "circle_packing.json"
+    output_file.unlink(missing_ok=True)
     subprocess.run(
-        ["uv", "run", "-qq", "--directory", str(CANDIDATE_DIR), "python", "main.py"],
+        ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
         check=True,
         timeout=CANDIDATE_TIMEOUT_SECONDS,
     )
-    return json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+    return json.loads(output_file.read_text(encoding="utf-8"))
 
 
-def main() -> None:
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
-        payload = run_candidate()
+        payload = run_candidate(evo_dir)
         if not isinstance(payload, dict):
             raise ValueError("Candidate output must be a JSON object")
         valid, error, radii = validate_packing(
@@ -88,4 +96,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()

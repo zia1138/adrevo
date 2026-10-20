@@ -6,20 +6,32 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import typer
 from scipy.spatial import ConvexHull
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 #BENCHMARK = 0.030936889034895654
 NUM_POINTS = 13
-OUTPUT_FILE = Path("evo/heilbronn_convex_13.json")
 def triangle_area(p1, p2, p3):
     return abs(p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1]) + p3[0] * (p1[1] - p2[1])) / 2
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
+    output_file = evo_dir / "heilbronn_convex_13.json"
     try:
-        OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
-        points = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["points"]
+        output_file.unlink(missing_ok=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
+        points = json.loads(output_file.read_text(encoding="utf-8"))["points"]
     except Exception as exc:
         Path("results.json").write_text(json.dumps({"correct": False, "error": str(exc), "combined_score": 0.0}, indent=4), encoding="utf-8")
         raise SystemExit
@@ -56,3 +68,7 @@ if __name__ == "__main__":
         "combined_score": combined_score,
     }
     Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    app()

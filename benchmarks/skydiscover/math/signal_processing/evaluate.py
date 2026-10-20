@@ -5,10 +5,16 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import typer
 from scipy.stats import pearsonr
 
-INPUT_FILE = Path("evo/signal_processing_input.json")
-OUTPUT_FILE = Path("evo/signal_processing.json")
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
+
 
 
 def safe_float(value):
@@ -113,19 +119,25 @@ def generate_test_signals(num_signals=5):
     return test_signals
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
+    input_file = evo_dir / "signal_processing_input.json"
+    output_file = evo_dir / "signal_processing.json"
     test_signals = generate_test_signals(5)
     try:
-        OUTPUT_FILE.unlink(missing_ok=True)
-        INPUT_FILE.write_text(
+        output_file.unlink(missing_ok=True)
+        input_file.write_text(
             json.dumps({
                 "noisy_signals": [signal.tolist() for signal, _ in test_signals],
                 "window_size": 20,
             }),
             encoding="utf-8",
         )
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
-        candidate_outputs = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))["filtered_signals"]
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
+        candidate_outputs = json.loads(output_file.read_text(encoding="utf-8"))["filtered_signals"]
         if len(candidate_outputs) != len(test_signals):
             raise ValueError("Candidate returned the wrong number of filtered signals")
     except Exception as exc:
@@ -215,3 +227,7 @@ if __name__ == "__main__":
         }
 
     Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    app()

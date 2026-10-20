@@ -6,15 +6,22 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import typer
 
-CANDIDATE_DIR = Path("evo")
-OUTPUT_FILE = CANDIDATE_DIR / "sums_diffs.json"
+
 CANDIDATE_TIMEOUT_SECONDS = 180
 MIN_SET_SIZE = 2
 MAX_SET_SIZE = 512
 MIN_INTEGER = -1_000_000
 MAX_INTEGER = 1_000_000
 INTEGER_TOLERANCE = 1e-9
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 def normalize_values(value: Any) -> list[int]:
@@ -69,20 +76,22 @@ def evaluate_values(value: Any) -> dict[str, int | float]:
     }
 
 
-def run_candidate() -> dict[str, Any]:
+def run_candidate(evo_dir: Path) -> dict[str, Any]:
     """Run the candidate in its own uv project and read its JSON output."""
-    OUTPUT_FILE.unlink(missing_ok=True)
+    output_file = evo_dir / "sums_diffs.json"
+    output_file.unlink(missing_ok=True)
     subprocess.run(
-        ["uv", "run", "-qq", "--directory", str(CANDIDATE_DIR), "python", "main.py"],
+        ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
         check=True,
         timeout=CANDIDATE_TIMEOUT_SECONDS,
     )
-    return json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+    return json.loads(output_file.read_text(encoding="utf-8"))
 
 
-def main() -> None:
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
-        payload = run_candidate()
+        payload = run_candidate(evo_dir)
         if not isinstance(payload, dict):
             raise ValueError("candidate output must be a JSON object")
         stats = evaluate_values(payload.get("values"))
@@ -107,4 +116,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()

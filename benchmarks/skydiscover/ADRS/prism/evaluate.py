@@ -11,6 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import typer
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 GPU_MEM_SIZE = 80  # GB
@@ -124,20 +132,24 @@ def generate_test_gpu_models(num_tests=50):
     return test_cases
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
         # Build evaluator-owned inputs before importing submission code. Python
         # imports execute module-level code in this process, so import main only
         # after test generation and dependency capture are complete.
         test_gpu_models = generate_test_gpu_models()
-        input_path = Path("evo/input.json")
-        output_path = Path("evo/output.json")
+        input_path = evo_dir / "input.json"
+        output_path = evo_dir / "output.json"
         output_path.unlink(missing_ok=True)
         input_path.write_text(json.dumps({"requests": [
             {"gpu_num": gpu_num, "models": [vars(model) for model in models]}
             for gpu_num, models in test_gpu_models
         ]}), encoding="utf-8")
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
         candidate_placements = json.loads(output_path.read_text(encoding="utf-8"))["placements"]
         if len(candidate_placements) != len(test_gpu_models):
             raise ValueError("Candidate returned the wrong number of placements")
@@ -262,3 +274,7 @@ if __name__ == "__main__":
 
     with open("results.json", "w") as f:
         json.dump(result, f, indent=4)
+
+
+if __name__ == "__main__":
+    app()

@@ -5,9 +5,16 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import typer
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 N = 26
-OUTPUT_FILE = Path("evo/circle_packing.json")
 
 
 def validate_packing(centers, radii, atol=1e-10):
@@ -45,14 +52,23 @@ def validate_packing(centers, radii, atol=1e-10):
     return True, None
 
 
-if __name__ == "__main__":
+@app.command()
+def run(evo_dir: Path) -> None:
+    output_file = evo_dir / "circle_packing.json"
     try:
-        OUTPUT_FILE.unlink(missing_ok=True)
-        subprocess.run(["uv", "run", "-qq", "--directory", "evo", "python", "main.py"], check=True)
-        payload = json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+        output_file.unlink(missing_ok=True)
+        subprocess.run(
+            ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
+            check=True,
+        )
+        payload = json.loads(output_file.read_text(encoding="utf-8"))
         is_valid, error_msg = validate_packing(payload["centers"], payload["radii"])
         result = {"correct": is_valid, "error": error_msg,
                   "combined_score": float(np.sum(payload["radii"])) if is_valid else 0.0}
     except Exception as exc:
         result = {"correct": False, "error": str(exc), "combined_score": 0.0}
     Path("results.json").write_text(json.dumps(result, indent=4), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    app()

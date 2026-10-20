@@ -5,12 +5,19 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import typer
+
 
 MATRIX_SIZE = 29
 REFERENCE_DETERMINANT = 1_270_698_346_568_170_340_352
-CANDIDATE_DIR = Path("evo")
-OUTPUT_FILE = CANDIDATE_DIR / "hadamard.json"
 CANDIDATE_TIMEOUT_SECONDS = 350
+
+app = typer.Typer()
+
+
+@app.callback()
+def cli() -> None:
+    """Evaluate candidate implementations."""
 
 
 def validate_matrix(value: Any) -> list[list[int]]:
@@ -71,20 +78,22 @@ def evaluate_matrix(value: Any) -> tuple[int, float]:
     return absolute_determinant, ratio
 
 
-def run_candidate() -> dict[str, Any]:
+def run_candidate(evo_dir: Path) -> dict[str, Any]:
     """Run the candidate in its own uv project and read its JSON output."""
-    OUTPUT_FILE.unlink(missing_ok=True)
+    output_file = evo_dir / "hadamard.json"
+    output_file.unlink(missing_ok=True)
     subprocess.run(
-        ["uv", "run", "-qq", "--directory", str(CANDIDATE_DIR), "python", "main.py"],
+        ["uv", "run", "-qq", "--directory", str(evo_dir), "python", "main.py"],
         check=True,
         timeout=CANDIDATE_TIMEOUT_SECONDS,
     )
-    return json.loads(OUTPUT_FILE.read_text(encoding="utf-8"))
+    return json.loads(output_file.read_text(encoding="utf-8"))
 
 
-def main() -> None:
+@app.command()
+def run(evo_dir: Path) -> None:
     try:
-        payload = run_candidate()
+        payload = run_candidate(evo_dir)
         if not isinstance(payload, dict):
             raise ValueError("candidate output must be a JSON object")
         absolute_determinant, ratio = evaluate_matrix(payload.get("matrix"))
@@ -108,4 +117,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()
