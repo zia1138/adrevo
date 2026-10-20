@@ -43,9 +43,9 @@ uv run adrevo run examples/circle_packing --config config_cerebras.py --verbose
 
 Adrevo evolves candidate code; it does not decide whether that code is correct. You provide the trusted evaluator that does.
 
-1. You provide a project with trusted `evaluate.py`, candidate files under `evo/`, and a configuration.
+1. You provide a project with trusted `evaluate.py`, candidate files under the configured `evo_dir`, and a configuration.
 2. Adrevo asks models for replacements of the configured candidate files. It never edits `evaluate.py`.
-3. For each replacement, Adrevo runs `evaluate.py`. The evaluator builds and runs the candidate, validates its output, and writes `results.json`.
+3. For each replacement, Adrevo runs `uv run python evaluate.py run <evo_dir>`. The evaluator builds and runs the candidate, validates its output, and writes `results.json`.
 4. Adrevo reads `results.json` and keeps candidates with a better `combined_score`.
 
 This boundary lets the evaluator stay stable and language-specific while the evolved candidate can use Python, Rust, Go, Node, or another runtime.
@@ -57,14 +57,18 @@ Each project separates trusted evaluation from evolved code. This boundary keeps
 There are three environments:
 
 - **Adrevo:** the repository's `uv` environment runs the controller.
-- **Evaluator:** your root project's `pyproject.toml` and `uv` environment run trusted `evaluate.py`, separately from Adrevo's controller dependencies.
-- **Candidate:** `evo/` is built and run by the evaluator with uv, Cargo, Go, Node, Docker, or another runtime.
+- **Evaluator:** your root project's `pyproject.toml` and `uv` environment run trusted `evaluate.py`, separately from Adrevo's controller dependencies. Include Typer in this environment.
+- **Candidate:** the configured `evo_dir` (`evo/` by default) is built and run by the evaluator with uv, Cargo, Go, Node, Docker, or another runtime.
 
-Manage dependencies for evolved code in `evo/` yourself—for example, in `evo/pyproject.toml`. Adrevo does not install or list them.
+Manage dependencies for evolved code in `evo_dir` yourself—for example, in the default `evo/pyproject.toml`. Adrevo does not install or list them.
 
 Each evaluation follows this contract:
 
-1. Adrevo copies the project, replaces the candidate files returned by the model, and runs `evaluate.py` in the `uv` environment you specified for the trusted evaluator.
+```bash
+uv run python evaluate.py run <evo_dir>
+```
+
+1. Adrevo copies the project, replaces the candidate files returned by the model, and invokes the Typer evaluator in the root project's `uv` environment.
 2. Trusted `evaluate.py` builds and runs the candidate, then validates its output file.
 3. The evaluator writes `results.json`; Adrevo reads it to decide whether the candidate improved.
 
@@ -94,7 +98,7 @@ my-project/
 
 ### Multiple evolvable files
 
-`AdrevoConfig.evolvable_files` is the explicit allowlist of complete files Adrevo may modify. Each `EvolvableFile(file, lang_identifier)` gives a project-relative path under `evo/` and the Markdown fence language used to exchange that file with the model. The default is `evo/main.py` as Python.
+`AdrevoConfig.evolvable_files` is the explicit allowlist of complete files Adrevo may modify. Each `EvolvableFile(file, lang_identifier)` gives a project-relative path under `evo_dir` and the Markdown fence language used to exchange that file with the model. `evo_dir` defaults to `evo`, and the default evolvable file is `evo/main.py` as Python.
 
 Models return complete replacements for one or more allowlisted files; files omitted from a response remain unchanged. For example, allow the candidate's source and dependencies to evolve together:
 

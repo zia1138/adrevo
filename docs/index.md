@@ -6,7 +6,7 @@ This page is the operational reference. For the quickstart and benchmark results
 
 ## Execution contract
 
-Adrevo starts from the project directory passed to `adrevo run`: it loads `config.py`, reads every file in `AdrevoConfig.evolvable_files`, and keeps the original directory unchanged. For each candidate, it creates a new temporary directory containing a copy of the project files and replaces the allowlisted files returned by the model. It then runs trusted `evaluate.py` in the root project's uv environment—the environment you define with the root `pyproject.toml`.
+Adrevo starts from the project directory passed to `adrevo run`: it loads `config.py`, reads every file in `AdrevoConfig.evolvable_files`, and keeps the original directory unchanged. For each candidate, it creates a temporary project copy, applies the candidate replacements, and runs `uv run python evaluate.py run <evo_dir>` in the root project's uv environment.
 
 `evaluate.py` owns the rest of evaluation: it builds and runs the candidate, validates the candidate's output file, and writes `results.json`. Adrevo reads only that trusted result:
 
@@ -33,16 +33,16 @@ my-project/
 There are three independent environments:
 
 - **Adrevo:** the repository's uv environment runs the controller, Ray, and model orchestration.
-- **Trusted evaluator:** your root project's `pyproject.toml` defines the uv environment that runs `evaluate.py`. It is separate from Adrevo's controller dependencies.
-- **Candidate:** `evaluate.py` chooses how to build and run `evo/`: uv, Cargo, Go, Node, Docker, or another runtime.
+- **Trusted evaluator:** your root project's `pyproject.toml` defines the uv environment that runs the Typer-based `evaluate.py`. It is separate from Adrevo's controller dependencies.
+- **Candidate:** `evaluate.py` chooses how to build and run the configured `evo_dir` (`evo/` by default): uv, Cargo, Go, Node, Docker, or another runtime.
 
-Manage dependencies for evolved code in `evo/` yourself—for example, in `evo/pyproject.toml`. Adrevo does not install or list them.
+Manage dependencies for evolved code in `evo_dir` yourself—for example, in the default `evo/pyproject.toml`. Adrevo does not install or list them.
 
-The Ray backend runs the evaluator with `uv -q run --project . python evaluate.py`. A Python evaluator can run a uv-based candidate with, for example:
+The Ray backend runs the default evaluator with `uv run -qq --project . python evaluate.py run evo`. Its `run` command receives the implementation directory and can invoke a uv-based candidate with, for example:
 
 ```python
 subprocess.run(
-    ["uv", "run", "--directory", "evo", "python", "main.py"],
+    ["uv", "run", "--directory", str(evo_dir), "python", "main.py"],
     check=True,
 )
 ```
@@ -60,11 +60,11 @@ Important settings:
 
 | Object | Fields |
 |---|---|
-| `AdrevoConfig` | `evolvable_files` (default: `evo/main.py` as Python), evaluator timeout and termination-grace settings, models, worker count, generation/cost limits, strategies, and backtracking |
+| `AdrevoConfig` | `evo_dir` (default: `evo`), `evolvable_files` (default: `evo/main.py` as Python), evaluator timeout and termination-grace settings, models, worker count, generation/cost limits, strategies, and backtracking |
 
 ### Evolvable files
 
-`evolvable_files` is the explicit allowlist of complete candidate files Adrevo may modify. Every `EvolvableFile(file, lang_identifier)` must be under `evo/`; its language identifier tells Adrevo which Markdown code fence to use for that file. A model may return replacements for one or more allowlisted files. Files omitted from a response remain unchanged.
+`evolvable_files` is the explicit allowlist of complete candidate files Adrevo may modify. Every `EvolvableFile(file, lang_identifier)` must be under the configured `evo_dir`; its language identifier tells Adrevo which Markdown code fence to use for that file. A model may return replacements for one or more allowlisted files. Files omitted from a response remain unchanged.
 
 For example, evolve source and its candidate dependency manifest together:
 
@@ -132,7 +132,7 @@ uv run adrevo harbor benchmarks/AlgoTune/matrix_multiplication \
 `--agent-timeout-sec` controls Harbor's agent time limit (default: 3,600 seconds);
 it does not translate Adrevo's model-spending budget.
 
-Harbor collects the complete `evo/` candidate directory automatically, even with
+Harbor collects the complete configured candidate directory (`evo/` by default), even with
 verification disabled. It appears at:
 
 ```text
@@ -167,7 +167,7 @@ Project directory names must be distinct. To connect to Ray Client, pass `--ray-
 | Symptom | Check |
 |---|---|
 | No config found | Add `config.py` or `config_*.py`; use `--config` for several variants. |
-| Initial run fails | Run `evaluate.py` locally; it must run the candidate and write a valid `results.json`. |
+| Initial run fails | Run `uv run python evaluate.py run evo` locally; it must write a valid `results.json`. |
 | Candidate dependency failure | Check the runtime command and candidate manifest used by `evaluate.py`. |
 | Run ends early | Check generation/cost limits, evaluator timeout, and model credentials. |
 | Results directory exists | Choose a new `--results-dir`; use `resume` only for a checkpointed run. |
