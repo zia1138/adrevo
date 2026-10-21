@@ -64,6 +64,10 @@ class AdrevoConfig:
         evaluate_file: Name of the file to use for evaluation. Default is evaluate.py.
         evo_dir: Project-relative implementation directory passed to the evaluator.
             Default is evo.
+        project_archive_exclude_dirs: Project-relative directories omitted from
+            evaluation archives. Use this for externally managed data or caches.
+        evaluator_args: Additional command-line arguments appended after evo_dir
+            when invoking the evaluator's run command.
         evaluator_timeout_sec: Maximum seconds for trusted evaluate.py to run.
             Set to None to disable the timeout.
         evaluator_termination_grace_sec: Seconds to wait after sending SIGTERM
@@ -90,6 +94,8 @@ class AdrevoConfig:
     )
     evaluate_file: str = "evaluate.py"
     evo_dir: str = "evo"
+    project_archive_exclude_dirs: tuple[str, ...] = ()
+    evaluator_args: tuple[str, ...] = ()
     evaluator_timeout_sec: int | None = 10 * 60
     evaluator_termination_grace_sec: int = 30
     use_probe: bool = True
@@ -174,6 +180,39 @@ def validate_adrevo(cfg: AdrevoConfig) -> None:
             raise ValueError(f"File cannot be both fixed and evolvable: {fixed_file.file}")
         seen_fixed_files.add(path)
     _validate_relative_path(cfg.evaluate_file, "AdrevoConfig.evaluate_file")
+    if not isinstance(cfg.project_archive_exclude_dirs, tuple):
+        raise ValueError(
+            "AdrevoConfig.project_archive_exclude_dirs must be a tuple"
+        )
+    required_archive_paths = {
+        Path(cfg.evaluate_file),
+        Path(cfg.evo_dir),
+        Path("pyproject.toml"),
+    }
+    required_archive_paths.update(Path(item.file) for item in cfg.evolvable_files)
+    required_archive_paths.update(Path(item.file) for item in cfg.fixed_files)
+    seen_exclude_dirs: set[Path] = set()
+    for index, exclude_dir in enumerate(cfg.project_archive_exclude_dirs):
+        field_name = f"AdrevoConfig.project_archive_exclude_dirs[{index}]"
+        _validate_relative_path(exclude_dir, field_name)
+        exclude_path = Path(exclude_dir)
+        if exclude_path == Path("."):
+            raise ValueError(f"{field_name} must not be the project root")
+        if exclude_path in seen_exclude_dirs:
+            raise ValueError(f"Duplicate archive exclusion: {exclude_dir}")
+        for required_path in required_archive_paths:
+            if required_path == exclude_path or required_path.is_relative_to(exclude_path):
+                raise ValueError(
+                    f"{field_name} contains required project path: {required_path}"
+                )
+        seen_exclude_dirs.add(exclude_path)
+    if not isinstance(cfg.evaluator_args, tuple) or any(
+        not isinstance(argument, str) or not argument
+        for argument in cfg.evaluator_args
+    ):
+        raise ValueError(
+            "AdrevoConfig.evaluator_args must be a tuple of non-empty strings"
+        )
     if (
         cfg.evaluator_timeout_sec is not None
         and not _is_positive_int(cfg.evaluator_timeout_sec)

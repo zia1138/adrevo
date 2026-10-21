@@ -187,6 +187,7 @@ def run_evaluator(
     file_replacements: Dict[str, str],
     evaluator_file: str,
     evo_dir: str,
+    evaluator_args: tuple[str, ...],
     evaluator_timeout_sec: int | None,
     evaluator_termination_grace_sec: int,
     verbose: bool = False,
@@ -194,7 +195,18 @@ def run_evaluator(
     preempt_claim_id: str | None = None,
 ) -> Tuple[Dict[str, Any], float, bytes]:
     """Evaluate candidate file replacements with the trusted evaluator."""
-    cmd = ["uv", "run", "-qq", "--project", ".", "python", evaluator_file, "run", evo_dir]
+    cmd = [
+        "uv",
+        "run",
+        "-qq",
+        "--project",
+        ".",
+        "python",
+        evaluator_file,
+        "run",
+        evo_dir,
+        *evaluator_args,
+    ]
     started_at = time.time()
 
     if verbose:

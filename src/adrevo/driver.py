@@ -233,7 +233,10 @@ class AdrevoDriver:
             raise ValueError(f"Could not read initial evolvable files: {e}")
 
         # Zip the project directory to use as parent_zip_bytes for generation 0
-        parent_zip_bytes = zip_dir_to_bytes(self.project_dir)
+        parent_zip_bytes = zip_dir_to_bytes(
+            self.project_dir,
+            exclude_dirs=self.evo_config.project_archive_exclude_dirs,
+        )
 
         # Run the evaluation code using the Ray backend.
         results, rtime, result_zip_bytes = run_evaluator(
@@ -241,6 +244,7 @@ class AdrevoDriver:
             file_replacements={},
             evaluator_file=self.evo_config.evaluate_file,
             evo_dir=self.evo_config.evo_dir,
+            evaluator_args=self.evo_config.evaluator_args,
             evaluator_timeout_sec=self.evo_config.evaluator_timeout_sec,
             evaluator_termination_grace_sec=(
                 self.evo_config.evaluator_termination_grace_sec
