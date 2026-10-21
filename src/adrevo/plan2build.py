@@ -321,12 +321,16 @@ Keep algorithm implementations focused, self-contained, and easy to modify.
 
 The evaluator uses a Typer CLI:
 
-    uv run evaluate.py run <implementation_directory>
+    uv run python evaluate.py run <implementation_directory> [--data-dir <data_directory>]
 
 For example:
 
-    uv run evaluate.py run new_algorithm
-    uv run evaluate.py run baseline_method
+    uv run python evaluate.py run new_algorithm
+    uv run python evaluate.py run baseline_method
+
+`--data-dir` identifies the directory containing prepared experimental data.
+It defaults to `data/` alongside `evaluate.py`, but callers may provide an
+explicit path to prepared data.
 
 Given an implementation directory, the evaluator:
 
