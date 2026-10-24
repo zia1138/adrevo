@@ -14,11 +14,15 @@ Write a research plan to `RESEARCH_PLAN.md`.
 The goal is to identify the highest-impact opportunity for improving existing
 algorithms that can be investigated with a small, focused research environment.
 
-Focus on identifying one decisive experiment and its measurements that would
+Focus on identifying one key experiment and one primary measurement that would
 demonstrate an advance, not proposing an improved algorithm.
 
 Scientific impact is the priority, but implementation complexity and evaluation
 cost must remain low enough to support rapid algorithm discovery.
+
+Favor opportunities where incremental algorithmic innovations can produce
+measurable improvements over an existing method, without trivial shortcuts
+that artificially improve the measurement.
 
 ## Clarity and explanation
 
@@ -33,7 +37,7 @@ Throughout the plan:
 - Use simple, concrete examples to clarify ideas that are difficult to
   understand from abstract descriptions alone.
 - Explain why each important detail matters to the scientific objective.
-- Make the connections between the thesis, experiment, measurements, and
+- Make the connections between the thesis, experiment, measurement, and
   baseline explicit.
 
 Assume familiarity with general algorithms, mathematics, and computer science,
@@ -69,7 +73,7 @@ than improvements requiring large or complex software systems.
 Choose an opportunity that can be investigated through one focused, feasible
 experiment with a small implementation and inexpensive evaluations.
 
-## Experiment and measurements
+## Experiment and measurement
 
 Identify the single most compelling experiment for determining whether a
 hypothetical new algorithm represents an improvement over existing methods.
@@ -83,26 +87,59 @@ Derive the experiment directly from the algorithm discovery thesis.
    held constant, and why the experiment provides evidence for the thesis.
    Use a concrete example to make the experimental setup easy to understand.
 
-2. Under a **Measurements** subsection, specify:
-   - exactly what must be measured and how each metric is defined,
-   - correctness requirements and important performance tradeoffs,
-   - what must be controlled to ensure fair comparisons.
+2. Under a **Key measurement** subsection, identify the single most
+   informative quantitative metric for evaluating algorithmic improvement.
 
-   For each important measurement, explain:
-   - what the metric represents and why it matters,
-   - how it is calculated or obtained,
+   Explain:
+   - exactly what is measured and how the metric is calculated,
+   - why the metric directly reflects progress toward the thesis,
    - how to interpret its values, including whether higher or lower is better,
-   - and how changes in the metric relate to the proposed improvement.
+   - how incremental improvements in the algorithm would affect the metric,
+   - and what correctness requirements and experimental controls are needed
+     to ensure that improvements are meaningful.
 
-   Provide simple numerical or conceptual examples where they help clarify
-   the measurement. Explain relationships and tradeoffs between metrics,
-   rather than merely listing their definitions.
+   Use a simple numerical example to illustrate the measurement and how
+   different algorithms would compare.
+
+   Prefer a measurement that provides a sensitive, informative signal across
+   a range of algorithm quality, allowing gradual improvements to be detected.
+
+   Avoid binary success criteria, easily saturated metrics, or measurements
+   that only distinguish very large improvements.
+
+   Where important tradeoffs exist, define appropriate constraints or
+   supporting diagnostic metrics without introducing competing primary
+   objectives.
+
+3. Under a **Resistance to trivial solutions** subsection, critically examine
+   whether the key measurement can be improved without genuine algorithmic progress.
+
+   Identify plausible trivial, degenerate, or shortcut strategies that could
+   achieve a favorable measurement while failing to solve the intended problem.
+
+   Explain:
+   - how these strategies might exploit the proposed measurement,
+   - what correctness constraints or experimental conditions would rule them out,
+   - and why improving the measurement would then represent meaningful progress.
+
+   Consider shortcuts such as omitting difficult work, producing excessive or
+   empty outputs, exploiting fixed test instances, or shifting computational
+   costs into unmeasured resources where relevant.
+
+   Prefer measurements that are difficult to game and remain informative
+   across representative problem instances.
+
+   If a trivial strategy can achieve a competitive result without satisfying
+   the intended scientific objective, revise the measurement or experiment.
+
+   Do not penalize a simple algorithm merely for being simple. A genuinely
+   effective simple solution should receive a good measurement.
 
 The experiment should directly test the central claim of the thesis.
-Where multiple objectives matter, specify the relevant tradeoffs.
 
-Choose an experiment that maximizes scientific significance while remaining
-simple to implement, reproducible, and inexpensive to evaluate repeatedly.
+Choose an experiment and key measurement that maximize scientific significance
+while remaining simple to implement, reproducible, resistant to trivial
+shortcuts, and inexpensive to evaluate repeatedly.
 
 ## Baseline method
 
@@ -126,13 +163,17 @@ where helpful.
 Explain why the baseline is the most informative practical comparison and
 what performance or tradeoff it represents.
 
+The baseline should establish a meaningful reference value for the key
+measurement, against which incremental algorithmic improvements can be assessed.
+
 ## Guiding principles
 
 The research plan should form a coherent scientific argument:
 
     Highest-impact tractable problem or opportunity
-        -> One decisive experiment
-            -> Measurements required to demonstrate improvement
+        -> One key experiment
+            -> One primary measurement of algorithmic improvement
+            -> Resistance to trivial solutions
         -> One strong, self-contained baseline
 
 Focus on defining a valuable, measurable opportunity for algorithm discovery.
@@ -141,7 +182,7 @@ Do not propose new algorithms, solution mechanisms, architectures, or
 implementation strategies. Discovering how to achieve the improvement is
 a separate research activity.
 
-Choose the experiment, measurements, and baseline specifically to test
+Choose the experiment, measurement, and baseline specifically to test
 the thesis, not merely to reproduce a standard benchmark.
 
 Favor problems where the core algorithm can be implemented in a small amount
@@ -149,6 +190,9 @@ of readable code and evaluated quickly without substantial infrastructure.
 
 Avoid research directions that require reproducing large software systems,
 complex dependencies, extensive datasets, or expensive computational resources.
+
+Prioritize opportunities with a sensitive, gradually improvable measurement
+that rewards genuine algorithmic progress rather than benchmark exploitation.
 
 Prioritize scientific significance subject to implementation simplicity,
 evaluation efficiency, and feasibility.
@@ -160,9 +204,9 @@ Be clear, self-contained, specific, and decisive. Provide enough explanation
 and intuition for a technically sophisticated reader to understand the entire
 plan without specialized background.
 
-Select one high-impact opportunity, one compelling experiment, and one strong
-baseline rather than proposing multiple research directions, experiments,
-or comparison methods.
+Select one high-impact opportunity, one key experiment, one primary measurement,
+and one strong baseline rather than proposing multiple research directions,
+experiments, or comparison methods.
 """)
 
 # eval plan prompt below ------------------------------------------------------------------------------
@@ -190,72 +234,36 @@ implementations, minimal dependencies, and inexpensive repeated evaluations.
 
 ## Scoring system
 
-Use the measurements and correctness requirements in `RESEARCH_PLAN.md` to
+Use the key measurement and correctness requirements in `RESEARCH_PLAN.md` to
 define a single numeric `combined_score`, with higher values indicating better
 algorithms.
+
+The score must be computed independently for each implementation using only
+its measured performance and fixed evaluation criteria. It must not depend
+on the baseline's score or the performance of other implementations.
 
 Specify:
 
 - The exact primary and secondary metrics and how they are computed.
-- The formula for `combined_score`, including normalization or weighting.
+- The formula for `combined_score`, including any fixed normalization,
+  weighting, or constraints.
 - How incorrect, invalid, or failed implementations are scored.
 - Why the score captures meaningful progress toward the research thesis.
+
+Prefer a simple score derived directly from the key measurement. Use additional
+metrics as constraints or diagnostics rather than introducing unnecessary
+weighted objectives.
+
+The scoring formula and all normalization constants must be fixed across
+implementations and evaluation runs.
+
+The score should provide a meaningful signal for incremental algorithmic
+improvements without depending on relative rankings or baseline performance.
 
 All primary and secondary metrics must be reported independently in
 `results.json`, even when they are not included in `combined_score`.
 
 Keep scoring simple, scientifically meaningful, and inexpensive to compute.
-
-## What needs to be built
-
-Design the smallest evaluation harness capable of executing the experiment
-and producing the measurements specified in `RESEARCH_PLAN.md`.
-
-Use a simple, flat project structure:
-
-    prepare.py
-    evaluate.py
-    pyproject.toml
-    data/
-    new_algorithm/
-    baseline_method/
-
-Replace baseline_method with the name of the selected baseline algorithm.
-
-- `prepare.py` performs one-time preparation of experimental data and resources.
-- `evaluate.py` executes and evaluates any implementation directory.
-- `pyproject.toml` defines the uv environment for preparation and evaluation.
-- `data/` contains shared experimental data and configurations.
-- `new_algorithm/` contains the initial algorithm intended for improvement.
-- The baseline directory contains an independent implementation of the
-  selected comparison algorithm.
-
-The initial algorithm may use the baseline implementation as its starting
-point. Do not design a new algorithm as part of the evaluation environment.
-
-Use Python in `prepare.py` and `evaluate.py` for orchestration.
-
-Computationally intensive work may use any suitable programming language,
-including Python, C, C++, Rust, or CUDA.
-
-Keep performance-critical implementations in separate source files rather
-than embedding them in `prepare.py` or `evaluate.py`.
-
-For example, preparation may use a separate `prepare_native.cpp`, while
-algorithm implementations reside in their respective method directories.
-Additional source files are permitted when needed for computational work.
-
-The Python entry points should directly build and invoke these implementations
-using subprocesses or simple bindings.
-
-Do not embed native source code as Python strings or generate source files
-dynamically when ordinary source files would suffice.
-
-Do not introduce shell scripts, Makefiles, task runners, orchestration
-frameworks, or unnecessary helper modules. Keep orchestration in
-`prepare.py` and `evaluate.py`.
-
-Prefer simple functions over classes and abstractions unless clearly needed.
 
 ## Preparation
 
