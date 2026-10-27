@@ -11,202 +11,89 @@ Do not perform any web searches. Use only the information provided in the folder
 
 Write a research plan to `RESEARCH_PLAN.md`.
 
-The goal is to identify the highest-impact opportunity for improving existing
-algorithms that can be investigated with a small, focused research environment.
+Identify a scientifically valuable opportunity for algorithmic improvement and
+design one focused experiment to measure progress toward that opportunity.
 
-Focus on identifying one key experiment and one primary measurement that would
-demonstrate an advance, not proposing an improved algorithm.
+The plan must define one problem, experiment, key performance metric, and
+baseline that together provide a meaningful foundation for algorithm discovery.
 
-Scientific impact is the priority, but implementation complexity and evaluation
-cost must remain low enough to support rapid algorithm discovery.
+Do not propose a new algorithm. Define what is worth improving and how to
+reliably determine whether an algorithm is better.
 
-Favor opportunities where incremental algorithmic innovations can produce
-measurable improvements over an existing method, without trivial shortcuts
-that artificially improve the measurement.
+## Research plan
 
-## Clarity and explanation
+**Identify the opportunity.**
 
-Write for a technically sophisticated reader who is unfamiliar with the
-specific research area. The entire plan should be understandable without
-requiring the reader to consult the related literature.
+Select one important limitation, tradeoff, or unsolved problem in existing
+algorithms. Explain the problem, why existing methods struggle with it, and
+what improvement would constitute a scientific advance.
 
-Throughout the plan:
+**Design the experiment and key performance metric.**
 
-- Explain unfamiliar concepts and terminology when first introduced.
-- Provide intuition for important claims, methods, and measurements.
-- Use simple, concrete examples to clarify ideas that are difficult to
-  understand from abstract descriptions alone.
-- Explain why each important detail matters to the scientific objective.
-- Make the connections between the thesis, experiment, measurement, and
-  baseline explicit.
+Propose one experiment and one quantitative metric that directly measure
+progress toward the identified opportunity.
 
-Assume familiarity with general algorithms, mathematics, and computer science,
-but not specialized knowledge of the research topic.
+Choose the experiment and metric together to satisfy these requirements:
 
-Favor clear, intuitive explanations over dense technical shorthand.
-Preserve scientific precision, but provide additional explanation whenever
-a concept would otherwise be difficult to understand quickly.
+- **Scientific relevance:** Improving the metric represents genuine
+  algorithmic progress toward the research objective.
+- **Incremental feedback:** The metric distinguishes gradual improvements
+  across a broad range of algorithm quality.
+- **Intrinsic resistance to gaming:** The metric is inherently difficult
+  to optimize through trivial, degenerate, or shortcut solutions.
+- **Reliable evaluation:** The metric can be computed reproducibly and
+  inexpensively across representative problem instances.
 
-## Algorithm discovery thesis
+Specify the experimental conditions, how the metric is calculated, and
+how its values should be interpreted. Include a numerical example.
 
-Start with a section titled **Algorithm discovery thesis**.
+Explain why the metric's definition makes obvious shortcuts ineffective
+without relying on additional checks.
 
-Identify the most scientifically valuable limitation, tradeoff, or unsolved
-problem in existing methods that presents an opportunity for algorithmic improvement.
+**Design additional checks against metric gaming.**
 
-State one clear thesis that:
+Specify a small set of independent tests that detect whether an algorithm
+achieves a favorable metric by exploiting the evaluation rather than making
+genuine progress.
 
-- identifies the specific problem or limitation in existing methods,
-- explains why it matters and what makes it scientifically important,
-- describes the improvement that would constitute an advance,
-- and identifies the conditions under which that improvement would matter.
+For each test, explain what shortcut it detects, how it works, and what
+constitutes passing or failing.
 
-Describe the desired improvement in terms of observable outcomes, not a
-proposed algorithm, mechanism, or implementation.
+Apply the same checks to all algorithms. Keep them simple, reproducible,
+and separate from the primary optimization metric.
 
-Explain the underlying problem and why existing algorithms struggle with it.
-Use a concrete example where helpful to make the opportunity intuitive.
+**Select the baseline.**
 
-Prioritize opportunities involving focused, self-contained algorithms rather
-than improvements requiring large or complex software systems.
+Choose one strong, self-contained algorithm from previous work that provides
+a credible reference for the experiment.
 
-Choose an opportunity that can be investigated through one focused, feasible
-experiment with a small implementation and inexpensive evaluations.
+Explain how the baseline works, why it is the appropriate comparison, and
+what improvement in the key performance metric would represent progress.
 
-## Experiment and measurement
+## Scope and presentation
 
-Identify the single most compelling experiment for determining whether a
-hypothetical new algorithm represents an improvement over existing methods.
+Prioritize scientific impact while keeping the research environment small,
+understandable, and inexpensive to evaluate repeatedly.
 
-Derive the experiment directly from the algorithm discovery thesis.
+Favor focused algorithms over complex software systems, extensive datasets,
+or expensive infrastructure.
 
-1. Describe the experiment, the scientific question it addresses, and the
-   conditions or problem instances under which it should be conducted.
+Write for a technically sophisticated reader unfamiliar with the research
+area. Explain unfamiliar concepts, provide intuition, and use concrete
+examples where helpful.
 
-   Explain how the experiment works conceptually, what is varied, what is
-   held constant, and why the experiment provides evidence for the thesis.
-   Use a concrete example to make the experimental setup easy to understand.
+Make concrete, justified research decisions rather than presenting a list
+of possibilities or generic evaluation recommendations.
 
-2. Under a **Key measurement** subsection, identify the single most
-   informative quantitative metric for evaluating algorithmic improvement.
+Organize the plan for clarity. Ensure the problem, experiment, metric,
+additional checks, and baseline form a coherent scientific argument.
 
-   Explain:
-   - exactly what is measured and how the metric is calculated,
-   - why the metric directly reflects progress toward the thesis,
-   - how to interpret its values, including whether higher or lower is better,
-   - how incremental improvements in the algorithm would affect the metric,
-   - and what correctness requirements and experimental controls are needed
-     to ensure that improvements are meaningful.
+Do not propose new algorithms or design evaluation infrastructure.
+Those belong in subsequent stages.
 
-   Use a simple numerical example to illustrate the measurement and how
-   different algorithms would compare.
-
-   Prefer a measurement that provides a sensitive, informative signal across
-   a range of algorithm quality, allowing gradual improvements to be detected.
-
-   Avoid binary success criteria, easily saturated metrics, or measurements
-   that only distinguish very large improvements.
-
-   Where important tradeoffs exist, define appropriate constraints or
-   supporting diagnostic metrics without introducing competing primary
-   objectives.
-
-3. Under a **Resistance to trivial solutions** subsection, critically examine
-   whether the key measurement can be improved without genuine algorithmic progress.
-
-   Identify plausible trivial, degenerate, or shortcut strategies that could
-   achieve a favorable measurement while failing to solve the intended problem.
-
-   Explain:
-   - how these strategies might exploit the proposed measurement,
-   - what correctness constraints or experimental conditions would rule them out,
-   - and why improving the measurement would then represent meaningful progress.
-
-   Consider shortcuts such as omitting difficult work, producing excessive or
-   empty outputs, exploiting fixed test instances, or shifting computational
-   costs into unmeasured resources where relevant.
-
-   Prefer measurements that are difficult to game and remain informative
-   across representative problem instances.
-
-   If a trivial strategy can achieve a competitive result without satisfying
-   the intended scientific objective, revise the measurement or experiment.
-
-   Do not penalize a simple algorithm merely for being simple. A genuinely
-   effective simple solution should receive a good measurement.
-
-The experiment should directly test the central claim of the thesis.
-
-Choose an experiment and key measurement that maximize scientific significance
-while remaining simple to implement, reproducible, resistant to trivial
-shortcuts, and inexpensive to evaluate repeatedly.
-
-## Baseline method
-
-Identify a single strong, self-contained algorithmic baseline for testing
-the algorithm discovery thesis in the selected experiment.
-
-Choose a baseline that:
-
-- represents a credible and scientifically meaningful method from previous work,
-- directly addresses the limitation or tradeoff identified in the thesis,
-- can be implemented faithfully without reproducing a complex software system,
-- has a small, well-defined algorithmic interface,
-- and can be evaluated efficiently across many candidate implementations.
-
-Prefer a focused algorithm over a complete application, framework, or
-large software package.
-
-Explain how the baseline works at a conceptual level, using a simple example
-where helpful.
-
-Explain why the baseline is the most informative practical comparison and
-what performance or tradeoff it represents.
-
-The baseline should establish a meaningful reference value for the key
-measurement, against which incremental algorithmic improvements can be assessed.
-
-## Guiding principles
-
-The research plan should form a coherent scientific argument:
-
-    Highest-impact tractable problem or opportunity
-        -> One key experiment
-            -> One primary measurement of algorithmic improvement
-            -> Resistance to trivial solutions
-        -> One strong, self-contained baseline
-
-Focus on defining a valuable, measurable opportunity for algorithm discovery.
-
-Do not propose new algorithms, solution mechanisms, architectures, or
-implementation strategies. Discovering how to achieve the improvement is
-a separate research activity.
-
-Choose the experiment, measurement, and baseline specifically to test
-the thesis, not merely to reproduce a standard benchmark.
-
-Favor problems where the core algorithm can be implemented in a small amount
-of readable code and evaluated quickly without substantial infrastructure.
-
-Avoid research directions that require reproducing large software systems,
-complex dependencies, extensive datasets, or expensive computational resources.
-
-Prioritize opportunities with a sensitive, gradually improvable measurement
-that rewards genuine algorithmic progress rather than benchmark exploitation.
-
-Prioritize scientific significance subject to implementation simplicity,
-evaluation efficiency, and feasibility.
-
-Do not design the evaluation infrastructure or prescribe implementation details.
-Those belong in a separate evaluation plan.
-
-Be clear, self-contained, specific, and decisive. Provide enough explanation
-and intuition for a technically sophisticated reader to understand the entire
-plan without specialized background.
-
-Select one high-impact opportunity, one key experiment, one primary measurement,
-and one strong baseline rather than proposing multiple research directions,
-experiments, or comparison methods.
+Be clear, specific, and decisive. Produce one research plan with one
+scientific opportunity, one experiment, one robust key performance metric,
+and one strong baseline.
 """)
 
 # eval plan prompt below ------------------------------------------------------------------------------
