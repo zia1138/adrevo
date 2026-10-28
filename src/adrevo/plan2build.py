@@ -43,6 +43,10 @@ Choose the experiment and metric together to satisfy these requirements:
   to optimize through trivial, degenerate, or shortcut solutions.
 - **Reliable evaluation:** The metric can be computed reproducibly and
   inexpensively across representative problem instances.
+- **Standalone evaluation:** The metric must be computable independently
+  for any algorithm using fixed experimental criteria. Its value must not
+  depend on baseline performance, relative improvement, or comparisons with
+  other methods.
 
 Specify the experimental conditions, how the metric is calculated, and
 how its values should be interpreted. Include a numerical example.
@@ -53,11 +57,15 @@ without relying on additional checks.
 **Design additional checks against metric gaming.**
 
 Specify a small set of independent tests that detect whether an algorithm
-achieves a favorable metric by exploiting the evaluation rather than making
-genuine progress.
+achieves a favorable performance metric by exploiting the evaluation rather
+than making genuine progress.
 
 For each test, explain what shortcut it detects, how it works, and what
 constitutes passing or failing.
+
+Focus on direct exploitation of the metric or evaluation procedure.
+Do not design checks for overfitting or generalization, which will be
+handled separately.
 
 Apply the same checks to all algorithms. Keep them simple, reproducible,
 and separate from the primary optimization metric.
@@ -105,9 +113,10 @@ information provided in the folder.
 
 Write an evaluation plan to `EVAL_PLAN.md`.
 
-Treat the algorithm discovery thesis, experiment, and baseline in
-`RESEARCH_PLAN.md` as the scientific objectives. Do not replace them with
-a different research direction or introduce additional experiments or baselines.
+Treat the algorithm discovery thesis, experiment, key performance metric,
+anti-gaming checks, and baseline in `RESEARCH_PLAN.md` as the scientific
+objectives. Do not replace them with a different research direction or
+introduce additional experiments or baselines.
 
 The goal is to produce a concrete implementation plan for the smallest
 effective evaluation harness that can execute the experiment, measure the
@@ -121,9 +130,9 @@ implementations, minimal dependencies, and inexpensive repeated evaluations.
 
 ## Scoring system
 
-Use the key measurement and correctness requirements in `RESEARCH_PLAN.md` to
-define a single numeric `combined_score`, with higher values indicating better
-algorithms.
+Use the key performance metric and correctness requirements in
+`RESEARCH_PLAN.md` to define a single numeric `combined_score`, with higher
+values indicating better algorithms.
 
 The score must be computed independently for each implementation using only
 its measured performance and fixed evaluation criteria. It must not depend
@@ -134,12 +143,13 @@ Specify:
 - The exact primary and secondary metrics and how they are computed.
 - The formula for `combined_score`, including any fixed normalization,
   weighting, or constraints.
-- How incorrect, invalid, or failed implementations are scored.
+- The fixed, noncompetitive score assigned to invalid implementations or
+  failed correctness and anti-gaming checks.
 - Why the score captures meaningful progress toward the research thesis.
 
-Prefer a simple score derived directly from the key measurement. Use additional
-metrics as constraints or diagnostics rather than introducing unnecessary
-weighted objectives.
+Prefer a simple score derived directly from the key performance metric.
+Use additional metrics as constraints or diagnostics rather than introducing
+unnecessary weighted objectives.
 
 The scoring formula and all normalization constants must be fixed across
 implementations and evaluation runs.
@@ -151,6 +161,24 @@ All primary and secondary metrics must be reported independently in
 `results.json`, even when they are not included in `combined_score`.
 
 Keep scoring simple, scientifically meaningful, and inexpensive to compute.
+
+## Anti-gaming checks
+
+Specify how to implement the anti-gaming checks in `RESEARCH_PLAN.md`.
+Preserve their scientific intent and make the engineering decisions needed
+to execute them reliably.
+
+Define the test inputs, procedures, pass/fail criteria, and any required
+reference data or thresholds.
+
+Apply the checks consistently across algorithms. Failed anti-gaming checks
+must result in a noncompetitive `combined_score`, regardless of the primary
+metric.
+
+Report check outcomes separately in `results.json`.
+
+Keep the checks reproducible and inexpensive. Specify how to verify that
+they detect their intended failure modes.
 
 ## Preparation
 
@@ -199,7 +227,7 @@ Algorithms must not compute their own evaluation metrics or `combined_score`.
 They only produce outputs from the provided inputs.
 
 The evaluator independently reads these outputs, validates correctness,
-and computes all metrics.
+runs anti-gaming checks, and computes all metrics.
 
 New algorithms must be evaluable without modifying the evaluator.
 
@@ -233,8 +261,9 @@ Given an implementation directory, the evaluator:
 2. Builds or prepares the algorithm's execution environment if needed.
 3. Executes the algorithm with the required inputs and output file path.
 4. Reads the algorithm's output file.
-5. Validates correctness and computes all evaluation metrics.
-6. Writes `results.json` to the project root, alongside `evaluate.py`.
+5. Validates correctness and runs anti-gaming checks.
+6. Computes all evaluation metrics and `combined_score`.
+7. Writes `results.json` to the project root, alongside `evaluate.py`.
 
 Use Python to manage the evaluation lifecycle, including compilation,
 execution, output collection, validation, and scoring.
@@ -267,12 +296,16 @@ The output contract is:
     }
 
 The metrics above are illustrative. Use the actual primary and secondary
-metrics defined by the experiment.
+metrics defined by the experiment and add fields for anti-gaming check results.
 
-- `correct` indicates whether the implementation passed validation.
+- `correct` indicates whether mandatory validation checks passed.
 - `error` describes any evaluation failure, or is null on success.
 - `combined_score` is a finite numeric value, with higher values being better.
 - Every primary and secondary metric must be included as a separate field.
+- Report anti-gaming check results as separate Boolean fields, or null when
+  a result is unavailable.
+- Failed or incomplete mandatory checks set `correct` to false and produce
+  a noncompetitive `combined_score`.
 - Metrics must use consistent names, definitions, and units across methods.
 - Unavailable metrics should be reported as null.
 
@@ -302,7 +335,7 @@ Specify the concrete implementation design:
 - The implementation languages and dependencies for preparation and algorithms.
 - Which computational components require separate high-performance source files.
 - How Python will compile and invoke those components when necessary.
-- The correctness checks and experimental conditions.
+- The correctness checks, anti-gaming checks, and experimental conditions.
 - How `evaluate.py` computes each metric and `combined_score`.
 - How failures and invalid outputs are handled.
 
@@ -365,6 +398,8 @@ Define the commands and expected results needed to verify that:
   valid output files.
 - The evaluator correctly builds and executes the selected implementation.
 - The evaluator correctly validates algorithm outputs.
+- The anti-gaming checks detect their intended failure modes.
+- Failed mandatory checks produce a noncompetitive score.
 - All primary and secondary metrics are calculated and reported correctly.
 - `combined_score` is calculated correctly.
 - Both algorithms produce comparable, reproducible results.
@@ -388,7 +423,8 @@ Maintain a clear separation between:
 
 - Preparation: Generate shared experimental data once.
 - Algorithms: Transform experimental inputs into output files.
-- Evaluation: Validate outputs, compute metrics, and write results.json.
+- Evaluation: Validate outputs, run anti-gaming checks, compute metrics,
+  and write `results.json`.
 
 Use Python in `prepare.py` and `evaluate.py` for orchestration and
 straightforward computations.
@@ -427,8 +463,9 @@ environment following the specification in `EVAL_PLAN.md`.
 Read `EVAL_PLAN.md`, `RESEARCH_PLAN.md`, and inspect the existing code
 before making changes.
 
-Treat `EVAL_PLAN.md` as authoritative for the architecture, interfaces,
-algorithms, experimental conditions, measurements, and scoring.
+Treat `RESEARCH_PLAN.md` as authoritative for the scientific objectives
+and `EVAL_PLAN.md` as authoritative for their implementation, including
+architecture, interfaces, experimental conditions, validation, and scoring.
 
 The goal is to implement and verify the smallest working environment
 capable of executing the selected experiment and reliably measuring
@@ -477,13 +514,17 @@ Implement the specified file-based boundary between algorithms and the
 evaluator. Algorithms produce output files; the evaluator independently
 validates those outputs and computes the metrics.
 
+Implement the anti-gaming checks specified in `EVAL_PLAN.md`.
+Report their results separately in `results.json`. Failed mandatory
+checks must produce the specified noncompetitive `combined_score`.
+
 Preserve the evaluation contract:
 
-    uv run evaluate.py run <implementation_directory>
+    uv run python evaluate.py run <implementation_directory> [--data-dir <data_directory>]
 
 Each invocation must produce a fresh `results.json` in the project root,
-containing `correct`, `error`, `combined_score`, and all primary and
-secondary metrics specified in the plan.
+containing `correct`, `error`, `combined_score`, all primary and secondary
+metrics, and anti-gaming check results specified in the plan.
 
 Keep one-time data preparation separate from repeated evaluations.
 
@@ -498,8 +539,13 @@ end-to-end execution.
 Establish that:
 
 - Correctness checks accept valid outputs and reject invalid outputs.
+- Anti-gaming checks accept valid behavior and detect their intended
+  failure modes, using positive and negative test cases.
+- Failed anti-gaming checks produce the specified noncompetitive score.
 - Primary and secondary metrics are calculated correctly.
-- `combined_score` is calculated correctly from the specified measurements.
+- `combined_score` is calculated correctly from the specified metrics.
+- `combined_score` is computed independently for each algorithm without
+  referencing baseline performance or other implementations.
 - Invalid or failed implementations receive noncompetitive scores.
 - The baseline faithfully implements the selected algorithm.
 - All implementations are evaluated under fair, comparable conditions.
@@ -524,7 +570,7 @@ Verify that:
 - The baseline and `new_algorithm/` execute successfully.
 - Both follow the same algorithm input/output contract.
 - Each evaluation produces a valid root-level `results.json`.
-- All specified measurements are present and directly comparable.
+- All specified metrics and anti-gaming check results are present.
 - New implementation directories can be evaluated without modifying
   the evaluator.
 - Evaluation time and resource usage are practical for repeated runs.
@@ -545,7 +591,7 @@ Report:
 - What was implemented.
 - The commands used for verification.
 - The measured results for the baseline and initial algorithm.
-- Evidence that the evaluator and scoring are correct.
+- Evidence that the evaluator, scoring, and anti-gaming checks are correct.
 - Any discrepancies, unresolved issues, or scientific limitations.
 
 If completion is blocked, document the blocker and preserve the
@@ -559,7 +605,8 @@ research environment, not a general-purpose evaluation framework.
 Prioritize correctness and reproducibility without unnecessary complexity.
 
 Take ownership of implementation, debugging, and verification while
-preserving the scientific requirements in `EVAL_PLAN.md`.
+preserving the scientific requirements in `RESEARCH_PLAN.md` and the
+engineering specification in `EVAL_PLAN.md`.
 
 The deliverable is not merely working code. It is a verified research
 environment that can reliably evaluate new algorithms.
