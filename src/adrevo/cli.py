@@ -145,7 +145,7 @@ def eval_plan(
 def build(
     project_dir: str = typer.Argument(
         ...,
-        help="Path to project folder containing EVAL_PLAN.md.",
+        help="Path to project folder containing RESEARCH_PLAN.md and EVAL_PLAN.md.",
     ),
     results_dir: str = typer.Argument(
         ...,
@@ -161,10 +161,14 @@ def build(
             param_hint="project_dir",
         )
 
-    selected_plan_name = "EVAL_PLAN.md"
-    if not (project_path / selected_plan_name).is_file():
+    if not (project_path / "EVAL_PLAN.md").is_file():
         raise typer.BadParameter(
             f"EVAL_PLAN.md is required in {project_path}",
+            param_hint="project_dir",
+        )
+    if not (project_path / "RESEARCH_PLAN.md").is_file():
+        raise typer.BadParameter(
+            f"RESEARCH_PLAN.md is required in {project_path}",
             param_hint="project_dir",
         )
     if not (project_path / "BACKGROUND.md").is_file():
@@ -191,14 +195,9 @@ def build(
         else:
             results_path.unlink()
 
-    selected_files = frozenset({selected_plan_name, "BACKGROUND.md"})
     project_bytes = zip_dir_to_bytes(project_path)
     results_path.mkdir(parents=True)
-    extract_bytes_to_dir(
-        project_bytes,
-        results_path,
-        files_to_extract=selected_files,
-    )
+    extract_bytes_to_dir(project_bytes, results_path)
 
     (results_path / "BUILD.md").write_text(build_prompt, encoding="utf-8")
 
@@ -206,7 +205,7 @@ def build(
     typer.secho("Build workspace is ready.", fg=typer.colors.GREEN, bold=True)
     typer.echo("Run this from your terminal:")
     typer.secho(
-        f"cd {results_path} && codex 'Read BUILD.md, the selected plan, and BACKGROUND.md, then build the evaluation environment.'",
+        f"cd {results_path} && codex 'Read BUILD.md, EVAL_PLAN.md, RESEARCH_PLAN.md, and BACKGROUND.md, then build the evaluation environment.'",
         fg=typer.colors.CYAN,
         bold=True,
     )
@@ -215,7 +214,7 @@ def build(
     typer.secho("codex", fg=typer.colors.CYAN, bold=True)
     typer.echo("Then paste this prompt:")
     typer.secho(
-        "Read BUILD.md, the selected plan, and BACKGROUND.md, then build the evaluation environment.",
+        "Read BUILD.md, EVAL_PLAN.md, RESEARCH_PLAN.md, and BACKGROUND.md, then build the evaluation environment.",
         fg=typer.colors.CYAN,
         bold=True,
     )

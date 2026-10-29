@@ -95,8 +95,9 @@ class BuildTests(unittest.TestCase):
             project = Path(directory) / "project"
             project.mkdir()
             (project / "EVAL_PLAN.md").write_text("Evaluation plan")
+            (project / "RESEARCH_PLAN.md").write_text("Research plan")
             (project / "BACKGROUND.md").write_text("background")
-            (project / "unrelated.txt").write_text("do not copy")
+            (project / "existing.py").write_text("VALUE = 1\n")
             results = Path(directory) / "results"
 
             result = CliRunner().invoke(app, ["build", str(project), str(results)])
@@ -104,13 +105,33 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(result.exit_code, 0, result.output)
             self.assertEqual(
                 sorted(path.name for path in results.iterdir()),
-                ["BACKGROUND.md", "BUILD.md", "EVAL_PLAN.md"],
+                [
+                    "BACKGROUND.md",
+                    "BUILD.md",
+                    "EVAL_PLAN.md",
+                    "RESEARCH_PLAN.md",
+                    "existing.py",
+                ],
             )
+            self.assertEqual((results / "existing.py").read_text(), "VALUE = 1\n")
             self.assertIn("`EVAL_PLAN.md`", (results / "BUILD.md").read_text())
             self.assertIn("Build workspace is ready.", result.output)
             self.assertIn("codex 'Read BUILD.md", result.output)
             self.assertIn("start Codex interactively", result.output)
             self.assertIn("Then paste this prompt:", result.output)
+
+    def test_build_requires_research_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "project"
+            project.mkdir()
+            (project / "EVAL_PLAN.md").write_text("Evaluation plan")
+            (project / "BACKGROUND.md").write_text("Related work")
+            results = Path(directory) / "results"
+
+            result = CliRunner().invoke(app, ["build", str(project), str(results)])
+
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertIn("RESEARCH_PLAN.md is required", result.output)
 
     def test_build_requires_evaluation_plan(self):
         with tempfile.TemporaryDirectory() as directory:

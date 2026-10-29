@@ -20,7 +20,7 @@ uv run adrevo build eval-plans build-workspace
 
 `eval-plan` reads `RESEARCH_PLAN.md` and writes a self-contained `EVAL_PLAN.md`. It preserves the research thesis, defines the exact metrics and `combined_score`, and specifies a concrete, minimal evaluation harness: its files, algorithm interface, data, comparison implementations, dependencies, validation, resource budgets, and experimental controls.
 
-`build` requires the self-contained `EVAL_PLAN.md` and `BACKGROUND.md`; it does not need `RESEARCH_PLAN.md`. It copies those two files into a new workspace, then writes `BUILD.md` with instructions for implementing and validating the evaluator and comparison algorithms.
+`build` requires `RESEARCH_PLAN.md`, `EVAL_PLAN.md`, and `BACKGROUND.md`. It copies the project into a new workspace, then writes `BUILD.md` with instructions for implementing and validating the evaluator and comparison algorithms.
 
 ## Run example evolution
 
