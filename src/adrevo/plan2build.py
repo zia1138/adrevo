@@ -56,16 +56,17 @@ without relying on additional checks.
 
 **Design additional checks against metric gaming.**
 
-Specify a small set of independent tests that detect whether an algorithm
-achieves a favorable performance metric by exploiting the evaluation rather
-than making genuine progress.
+Specify a small set of independent checks that detect whether an algorithm
+achieves a favorable performance metric through invalid outputs or shortcuts
+that do not accomplish the intended task.
 
-For each test, explain what shortcut it detects, how it works, and what
+For each check, explain what shortcut it detects, how it works, and what
 constitutes passing or failing.
 
-Focus on direct exploitation of the metric or evaluation procedure.
-Do not design checks for overfitting or generalization, which will be
-handled separately.
+Focus on scientific correctness and the meaning of the performance metric.
+Do not propose overfitting or generalization tests, source-code hashing,
+file integrity checks, tamper detection, or restrictions on modifying
+algorithm implementations. Generalization will be evaluated separately.
 
 Apply the same checks to all algorithms. Keep them simple, reproducible,
 and separate from the primary optimization metric.
@@ -130,9 +131,12 @@ implementations, minimal dependencies, and inexpensive repeated evaluations.
 
 ## Scoring system
 
-Use the key performance metric and correctness requirements in
-`RESEARCH_PLAN.md` to define a single numeric `combined_score`, with higher
-values indicating better algorithms.
+Use the key performance metric defined in `RESEARCH_PLAN.md` directly as
+the numeric `combined_score`. Do not transform, normalize, or combine it
+with secondary metrics merely to change its scale or direction.
+
+The metric may be positive, negative, or zero, and may be either maximized
+or minimized. Specify its optimization direction clearly in `README.md`.
 
 The score must be computed independently for each implementation using only
 its measured performance and fixed evaluation criteria. It must not depend
@@ -141,20 +145,18 @@ on the baseline's score or the performance of other implementations.
 Specify:
 
 - The exact primary and secondary metrics and how they are computed.
-- The formula for `combined_score`, including any fixed normalization,
-  weighting, or constraints.
+- How the primary metric is reported as `combined_score`.
 - The fixed, noncompetitive score assigned to invalid implementations or
-  failed correctness and anti-gaming checks.
-- Why the score captures meaningful progress toward the research thesis.
+  failed correctness and anti-gaming checks, respecting the metric's direction.
+- Why the metric captures meaningful progress toward the research thesis.
 
-Prefer a simple score derived directly from the key performance metric.
-Use additional metrics as constraints or diagnostics rather than introducing
-unnecessary weighted objectives.
+Use secondary metrics as diagnostics rather than introducing additional
+optimization objectives.
 
-The scoring formula and all normalization constants must be fixed across
+The metric definition and evaluation conditions must remain fixed across
 implementations and evaluation runs.
 
-The score should provide a meaningful signal for incremental algorithmic
+The metric should provide a meaningful signal for incremental algorithmic
 improvements without depending on relative rankings or baseline performance.
 
 All primary and secondary metrics must be reported independently in
@@ -179,6 +181,11 @@ Report check outcomes separately in `results.json`.
 
 Keep the checks reproducible and inexpensive. Specify how to verify that
 they detect their intended failure modes.
+
+Focus on scientific correctness and shortcuts that undermine the primary
+metric. Do not design overfitting or generalization tests, which are handled
+separately. Do not introduce source-code hashing, file integrity monitoring,
+tamper detection, or restrictions on modifying algorithm implementations.
 
 ## Preparation
 
@@ -217,6 +224,11 @@ Each algorithm must:
 
 Specify the exact input and output formats, invocation method, and file paths.
 
+Design the algorithm interface to process experimental instances in large
+batches, preferably all instances in a single invocation. Avoid repeated
+calls from Python into compiled code for individual instances. The algorithm
+should process the batch internally and write the results to an output file.
+
 Use the simplest practical interface. Prefer files and command-line arguments
 over custom APIs, services, or communication frameworks.
 
@@ -230,6 +242,9 @@ The evaluator independently reads these outputs, validates correctness,
 runs anti-gaming checks, and computes all metrics.
 
 New algorithms must be evaluable without modifying the evaluator.
+Algorithm implementations must remain freely modifiable and replaceable.
+Preserve the evaluation interface and scientific criteria, not the
+implementation code.
 
 Choose implementation languages based on the experiment. Do not force
 algorithms into Python when compiled or GPU-accelerated implementations
@@ -283,35 +298,37 @@ Keep compilation and setup overhead separate from measured algorithm
 execution time unless the experiment explicitly requires otherwise.
 
 Keep intermediate algorithm outputs separate from evaluation results.
-Prevent stale outputs from affecting subsequent evaluations.
+Remove previous intermediate outputs before each evaluation.
 
 The output contract is:
 
     {
         "correct": true,
         "error": null,
-        "combined_score": 0.85,
-        "accuracy": 0.92,
-        "runtime_seconds": 1.42
+        "combined_score": 1.42,
+        "runtime_seconds": 1.42,
+        "accuracy": 0.92
     }
 
-The metrics above are illustrative. Use the actual primary and secondary
-metrics defined by the experiment and add fields for anti-gaming check results.
+The metrics above are illustrative. In this example, runtime is the primary
+metric and lower values are better. Use the actual metrics defined by the
+experiment and add fields for anti-gaming check results.
 
 - `correct` indicates whether mandatory validation checks passed.
 - `error` describes any evaluation failure, or is null on success.
-- `combined_score` is a finite numeric value, with higher values being better.
+- `combined_score` is the primary metric's value, with its optimization
+  direction documented in `README.md`.
 - Every primary and secondary metric must be included as a separate field.
 - Report anti-gaming check results as separate Boolean fields, or null when
   a result is unavailable.
 - Failed or incomplete mandatory checks set `correct` to false and produce
-  a noncompetitive `combined_score`.
+  the specified noncompetitive `combined_score`.
 - Metrics must use consistent names, definitions, and units across methods.
 - Unavailable metrics should be reported as null.
 
 Every invocation must produce a fresh `results.json` in the project root.
-Failed evaluations must produce a valid result with a noncompetitive score,
-never leave stale results from a previous run.
+Failed evaluations must produce a valid result with a finite, noncompetitive
+score, never leave stale results from a previous run.
 
 All algorithms must use identical evaluation criteria and comparable
 experimental conditions.
@@ -336,7 +353,7 @@ Specify the concrete implementation design:
 - Which computational components require separate high-performance source files.
 - How Python will compile and invoke those components when necessary.
 - The correctness checks, anti-gaming checks, and experimental conditions.
-- How `evaluate.py` computes each metric and `combined_score`.
+- How `evaluate.py` computes the primary and secondary metrics.
 - How failures and invalid outputs are handled.
 
 Choose the simplest implementation that satisfies the scientific requirements.
@@ -365,8 +382,8 @@ Require:
 - Comments explaining non-obvious algorithms, mathematics, and assumptions.
 - Docstrings or equivalent documentation for important functions.
 - Clear explanations of metric calculations and scientific reasoning.
-- A concise README explaining preparation, evaluation, and interpretation
-  of results.
+- A concise README explaining preparation, evaluation, the primary metric,
+  whether it should be maximized or minimized, and interpretation of results.
 
 Keep orchestration, computational implementations, and evaluation logic
 clearly separated so each can be understood independently.
@@ -401,7 +418,7 @@ Define the commands and expected results needed to verify that:
 - The anti-gaming checks detect their intended failure modes.
 - Failed mandatory checks produce a noncompetitive score.
 - All primary and secondary metrics are calculated and reported correctly.
-- `combined_score` is calculated correctly.
+- `combined_score` equals the primary metric for valid evaluations.
 - Both algorithms produce comparable, reproducible results.
 - Each evaluation writes a fresh `results.json` to the project root.
 - Evaluations are inexpensive enough for repeated algorithm discovery.
