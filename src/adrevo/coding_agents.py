@@ -1,4 +1,4 @@
-"""Simple streaming wrappers for Codex, Claude Code, and Gemini CLI.
+"""Simple streaming wrappers for Codex, Claude Code, Gemini CLI, Pi, and OpenCode.
 
 Requires the relevant CLI executable on PATH and already authenticated.
 Each wrapper manages one conversation; do not invoke the same instance concurrently.
@@ -31,7 +31,7 @@ def _shorten(s: str, limit: int = PRINT_LIMIT) -> str:
 
 @dataclass
 class TokenUsage:
-    # input_tokens includes cached input tokens for all three wrappers.
+    # input_tokens includes cached input tokens for all five wrappers.
     input_tokens: int = 0
     cached_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
@@ -440,4 +440,255 @@ class GeminiCLI(_Agent):
             raise RuntimeError(f"Gemini CLI failed: {_shorten(json.dumps(result), 300)}")
 
 
-__all__ = ["Codex", "ClaudeCode", "GeminiCLI", "TokenUsage", "PRINT_LIMIT"]
+
+
+class Pi(_Agent):
+    """Pi one-shot JSONL mode with persisted sessions and per-message accounting.
+
+    Pi emits a session header and a message_end event per completed message.
+    Assistant usage includes input, cache reads/writes, output, and cost.
+    """
+
+    def _command(self, resume: bool) -> list[str]:
+        cmd = ["pi", "--mode", "json"]
+        if self.model:
+            cmd.extend(["--model", self.model])
+        if self.reasoning_effort:
+            cmd.extend(["--thinking", self.reasoning_effort])
+        if resume:
+            # --session fails for an unknown session, unlike --session-id,
+            # which would silently create a new one.
+            cmd.extend(["--session", self.session_id])
+        return cmd
+
+    def _accept_event(self, event: dict) -> None:
+        if self.session_id is None and event.get("type") == "session":
+            self.session_id = event.get("id")
+
+    @staticmethod
+    def _assistant_messages(events: list[dict]) -> list[dict]:
+        return [
+            e["message"]
+            for e in events
+            if e.get("type") == "message_end"
+            and isinstance(e.get("message"), dict)
+            and e["message"].get("role") == "assistant"
+        ]
+
+    @staticmethod
+    def get_response(events: list[dict]) -> str:
+        messages = Pi._assistant_messages(events)
+        if not messages:
+            return ""
+        return "".join(
+            block.get("text", "")
+            for block in messages[-1].get("content", [])
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+
+    @staticmethod
+    def get_usage(events: list[dict]) -> TokenUsage:
+        total = TokenUsage()
+        for message in Pi._assistant_messages(events):
+            usage = message.get("usage") or {}
+            cached = int(usage.get("cacheRead", 0))
+            created = int(usage.get("cacheWrite", 0))
+            # Pi's input/cacheRead/cacheWrite are disjoint categories;
+            # its optional reasoning field is already part of output.
+            total += TokenUsage(
+                input_tokens=int(usage.get("input", 0)) + cached + created,
+                cached_input_tokens=cached,
+                cache_creation_input_tokens=created,
+                output_tokens=int(usage.get("output", 0)),
+                reasoning_output_tokens=int(usage.get("reasoning", 0)),
+            )
+        return total
+
+    def _account(self, events: list[dict]) -> None:
+        self.last_usage = self.get_usage(events)
+        self.total_usage += self.last_usage
+        costs = [
+            (message.get("usage") or {}).get("cost", {}).get("total")
+            for message in self._assistant_messages(events)
+        ]
+        if any(cost is not None for cost in costs):
+            self.last_cost_usd = sum(float(c) for c in costs if c is not None)
+            self.total_cost_usd = (self.total_cost_usd or 0.0) + self.last_cost_usd
+
+    def _validate(self, events: list[dict]) -> None:
+        settled = next(
+            (e for e in reversed(events) if e.get("type") == "agent_settled"),
+            None,
+        )
+        ended = next(
+            (e for e in reversed(events) if e.get("type") == "agent_end"),
+            None,
+        )
+        if settled is None and (ended is None or ended.get("willRetry")):
+            raise RuntimeError("Pi agent did not finish")
+        if settled is not None and settled.get("aborted"):
+            raise RuntimeError("Pi agent was aborted")
+        messages = self._assistant_messages(events)
+        if not messages:
+            raise RuntimeError("Pi returned no completed assistant message")
+        if messages[-1].get("stopReason") in {"error", "aborted", "length"}:
+            raise RuntimeError(
+                f"Pi assistant stopped: {messages[-1].get('stopReason')}"
+            )
+
+
+def _opencode_usage(tokens: dict) -> TokenUsage:
+    """Normalize OpenCode token categories to the shared TokenUsage semantics.
+
+    OpenCode's reasoning tokens are separate from output tokens (unlike
+    Codex/Pi), so add reasoning to output_tokens once here.
+    """
+    cache = tokens.get("cache") or {}
+    read = int(cache.get("read", 0))
+    write = int(cache.get("write", 0))
+    reasoning = int(tokens.get("reasoning", 0))
+    return TokenUsage(
+        input_tokens=int(tokens.get("input", 0)) + read + write,
+        cached_input_tokens=read,
+        cache_creation_input_tokens=write,
+        output_tokens=int(tokens.get("output", 0)) + reasoning,
+        reasoning_output_tokens=reasoning,
+    )
+
+
+class OpenCode(_Agent):
+    """OpenCode run JSONL mode with model variants and per-step accounting.
+
+    OpenCode can omit the final step_finish from its live stream in some
+    versions. If this happens, reconcile per-invocation usage and cost from
+    ``opencode session export`` using message IDs from the live stream.
+    """
+
+    def _command(self, resume: bool) -> list[str]:
+        cmd = ["opencode", "run", "--format", "json"]
+        if self.model:
+            cmd.extend(["--model", self.model])
+        if self.reasoning_effort:
+            cmd.extend(["--variant", self.reasoning_effort])
+        if resume:
+            cmd.extend(["--session", self.session_id])
+        return cmd
+
+    def _accept_event(self, event: dict) -> None:
+        if self.session_id is None:
+            self.session_id = event.get("sessionID") or (event.get("part") or {}).get("sessionID")
+
+    @staticmethod
+    def get_response(events: list[dict]) -> str:
+        return "".join(
+            str((e.get("part") or {}).get("text") or "")
+            for e in events
+            if e.get("type") == "text"
+        )
+
+    @staticmethod
+    def _completed_steps(events: list[dict]) -> list[dict]:
+        parts: list[dict] = []
+        seen: set[str] = set()
+        for event in events:
+            if event.get("type") != "step_finish":
+                continue
+            part = event.get("part") or {}
+            part_id = part.get("id")
+            if part_id and part_id in seen:
+                continue
+            if part_id:
+                seen.add(part_id)
+            parts.append(part)
+        return parts
+
+    @staticmethod
+    def get_usage(events: list[dict]) -> TokenUsage:
+        result = TokenUsage()
+        for part in OpenCode._completed_steps(events):
+            result += _opencode_usage(part.get("tokens") or {})
+        return result
+
+    def _reconcile_export(self, events: list[dict]) -> tuple[TokenUsage, float] | None:
+        """Recover missing final accounting from exported assistant messages."""
+        if not self.session_id:
+            return None
+        message_ids = {
+            (e.get("part") or {}).get("messageID")
+            for e in events
+            if isinstance(e.get("part"), dict)
+        }
+        message_ids.discard(None)
+        if not message_ids:
+            return None
+
+        # The export can be large for long-lived sessions; run it only if
+        # the stream did not include a final stop step.
+        proc = subprocess.run(
+            ["opencode", "session", "export", self.session_id],
+            cwd=self.cwd,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=True,
+        )
+        export = json.loads(proc.stdout)
+        matching = [
+            m.get("info") or {}
+            for m in export.get("messages", [])
+            if (m.get("info") or {}).get("role") == "assistant"
+            and (m.get("info") or {}).get("id") in message_ids
+        ]
+        if not matching:
+            return None
+        usage = TokenUsage()
+        cost = 0.0
+        for info in matching:
+            usage += _opencode_usage(info.get("tokens") or {})
+            cost += float(info.get("cost") or 0.0)
+        return usage, cost
+
+    def _account(self, events: list[dict]) -> None:
+        steps = self._completed_steps(events)
+        usage = self.get_usage(events)
+        cost = sum(float(p.get("cost") or 0) for p in steps)
+        has_cost = any(p.get("cost") is not None for p in steps)
+
+        # Some OpenCode versions stop emitting JSONL before the last
+        # step_finish. Prefer stored accounting when this is detected.
+        if events and not any(p.get("reason") == "stop" for p in steps):
+            try:
+                reconciled = self._reconcile_export(events)
+                if reconciled is not None:
+                    usage, cost = reconciled
+                    has_cost = True
+                else:
+                    print(
+                        "Warning: OpenCode usage may be incomplete "
+                        "(no final step_finish and no matching export messages)",
+                        file=sys.stderr,
+                    )
+            except (OSError, subprocess.CalledProcessError, ValueError, TypeError) as exc:
+                print(
+                    f"Warning: OpenCode usage may be incomplete: {_shorten(str(exc))}",
+                    file=sys.stderr,
+                )
+
+        self.last_usage = usage
+        self.total_usage += usage
+        if has_cost:
+            self.last_cost_usd = cost
+            self.total_cost_usd = (self.total_cost_usd or 0.0) + cost
+
+    def _validate(self, events: list[dict]) -> None:
+        errors = [e for e in events if e.get("type") == "error"]
+        if errors:
+            raise RuntimeError(
+                f"OpenCode execution failed: {_shorten(json.dumps(errors[-1]), 300)}"
+            )
+        if not events or self.session_id is None:
+            raise RuntimeError("OpenCode returned no session events")
+
+
+__all__ = ["Codex", "ClaudeCode", "GeminiCLI", "Pi", "OpenCode", "TokenUsage", "PRINT_LIMIT"]
