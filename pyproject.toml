@@ -35,3 +35,6 @@ dev = [
     "huggingface-hub>=1.6.0",
     "seaborn>=0.13.2",
 ]
+
+[tool.uv.workspace]
+exclude = ["research/*", "benchmarks/*", "examples/*"]
